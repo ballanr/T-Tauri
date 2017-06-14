@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 Lambda = splot.apStarWavegrid()
 import csv
 import sys
-import functions as f
+import Functions as f
 
 #Importing the apStar file
 
 '''
-Steps:
+To Do:
 
 - Create new directory for files
 - Read IDs from csv file
@@ -30,6 +30,7 @@ with open(csvname) as csvfile:
     reader = csv.DictReader(csvfile,delimiter='\t')
     
     for row in reader:
+        
         loc_id=int(row['Location ID'])
         twomass_id=row['2Mass ID']
 
