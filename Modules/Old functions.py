@@ -117,12 +117,8 @@ def Brackett_Equiv_Width(loc_id,twomass_id,j,EqW_array,emission_dict):
     #print(values)
     #return values
 
-def Velocity_Correction():
-    print(shiiiiiifffffttt)
 
-def find_nearest(array,value):
-    index = (np.abs(array-value)).argmin()
-    return index
+
 
 def Brackett_Catalog(loc_id,twomass_id):
     emission_dict={}
