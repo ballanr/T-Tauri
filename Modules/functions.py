@@ -5,17 +5,23 @@ def find_nearest(array,value):
 def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
     import numpy as np
     import apogee.tools.read as apread
+    from astropy.io import fits
 
     #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
 
     spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
     wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
     header = apread.apStar(4586,'2M03434449+3143092',ext=0,header=True)
-    
+
+    #Importing header via astropy--------------------------------------------------------------------------------------------------------------------|
+
+    main_header = fits.open(
+        '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/6218/56168/apVisit-r6-6218-56168-148.fits'
+        )
     #Barycentric Correction--------------------------------------------------------------------------------------------------------------------------|
     
-    vbcstring = 'BC' + str(1) #Somehow need to figure out which visit this MJD applies to
-    vbc = header[1][vbcstring]
+    #vbcstring = 'BC' + str(1) Somehow need to figure out which visit this MJD applies to
+    vbc = main_header[0].header['BC']
     observed_wavelength,shift = Barycentric_Correction(emission_line,vbc)
     
     #Equivalent Width Calculation--------------------------------------------------------------------------------------------------------------------|
@@ -58,7 +64,7 @@ def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
         EqW_rounded = round(EqW1/Fluxcontinuum,5)
         EqW = EqW1/Fluxcontinuum
     
-    return EqW,EqW_rounded
+    return EqW,EqW_rounded,vbc
  
 
 def Barycentric_Correction(emission_line,vbc):
@@ -93,5 +99,74 @@ def Max_Flux_Check(array,centerline):
     return y,z
 
 
-def Brackett_Ratios():
-    #blah
+def Brackett_Ratios(plateid,mjd,fiber):
+    
+    import csv
+    import os
+    from astropy.io import fits
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    #Creating file path------------------------------------------------------------------------------------------------------------------------------|
+
+    server = '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
+    plate = str(plateid)
+    MJD = str(mjd)
+    fiber_num = str(fiber)
+    therest = 'apVisit-r6-'
+    dashes = '-'
+    f = '.fits'
+
+    endname = therest + plate + dashes + MJD + dashes + fiber_num + f
+    filename = os.path.join(server,plate,MJD,endname)
+    
+    #Header------------------------------------------------------------------------------------------------------------------------------------------|
+
+    main_header = fits.open(filename)
+    
+    loc_id = main_header[0].header['LOCID']
+    twomass_id = main_header[0].header['OBJID']
+
+    #Reading in the Visits file----------------------------------------------------------------------------------------------------------------------|
+    
+
+    fileDir = os.path.dirname(os.path.realpath('__file__'))
+    filename = os.path.join(fileDir, '../Data/Average Visits.csv')
+    visits = os.path.abspath(os.path.realpath(filename))
+    
+    br_num = np.asarray([11,12,13,14,15,16,17,18,19,20])
+    br_value=np.zeros(10)
+
+    with open(visits) as csvfile:
+
+        reader = csv.DictReader(csvfile,delimiter='\t')
+
+        for row in reader:
+            if int(row['Location ID'])==loc_id and row['2Mass ID']==twomass_id:
+                for i in range(10):
+                    num = 11 + i
+                    br = 'Br' + str(num) + ' Avg EqW'
+                    br_value[i] = float(row[br])
+                '''
+                br_value.append([float(row['Br11 Avg EqW']),
+                            float(row['Br12 Avg EqW']),float(row['Br13 Avg EqW']),
+                            float(row['Br14 Avg EqW']),float(row['Br15 Avg EqW']),
+                            float(row['Br16 Avg EqW']),float(row['Br17 Avg EqW']),
+                            float(row['Br18 Avg EqW']),float(row['Br19 Avg EqW']),
+                            float(row['Br20 Avg EqW'])])
+                '''
+    print(br_value)
+    #Plotting---------------------------------------------------------------------------------------------------------------------------------------|    
+    
+    
+    
+    fig,ax=plt.subplots(figsize=(16,8))
+    ax.tick_params(axis='both', labelsize=20)
+    
+    
+    plt.plot(br_num,br_value/br_value[0])
+    plt.ylabel('Br n>11 / Br 11',fontsize=24)
+    plt.xlabel('n',fontsize=24)
+    plt.show()
+    
+
