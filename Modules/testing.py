@@ -1,6 +1,7 @@
 #Testing of modules done here
 
 import functions
+import matplotlib.pyplot as plt
 
 #x = Functions.Br_Equiv_Width(6218,56168,148,11)
 #print(x)
@@ -13,5 +14,23 @@ import functions
 #g = functions.Saha(1)
 #print(g)
 
-g = functions.SB_Plotter()
+#x = functions.Br_Equiv_Width_Plotter(6218,56168,148,11)
+'''for i in range(10):
+    x = functions.Br_Equiv_Width_Plotter(6218,56168,148,11+i)
+    string = 'Br ' + str(11+i)
+    plt.savefig('/Users/ballanr/Desktop/Test/' + string) '''
+#g = functions.SB_Plotter()
 #g = functions.SB_CSV('test3.csv')
+
+'''x = functions.apStar_to_apVisit(4617,'2M06450343-0034140')
+for i in range(x[0][3]):
+    x = functions.Br_Equiv_Width(x[i][0],x[i][1],x[i][2],11)
+    print(x)'''
+#x = functions.apVisit_Catalog_Output(
+#    '/Users/ballanr/Desktop/Research/test_visit.csv',
+#    'testest.csv')
+
+x = functions.apVisit_Catalog_Output(
+    '/Users/ballanr/Desktop/Research/test_visits.csv'
+    ,'Visits.csv')
+

@@ -1,34 +1,95 @@
+
+def apVisit_Catalog_Output(filename,savefile):
+    '''
+    Notes:
+    '''
+
+    import functions
+    import csv
+
+    #Setting up Dictionary----------------------------------------------------------------------------|
+    apVisit_Dict = {}
+
+    #Creating List------------------------------------------------------------------------------------|
+    master = []
+    with open(filename) as csvfile:
+
+        reader = csv.reader(csvfile,delimiter=',')
+        j = 0
+        for row in reader:
+            loc_id = int(row[1])
+            twomass_id = '%s' % row[0]
+            #print(loc_id,twomass_id,type(twomass_id))
+            x = functions.apStar_to_apVisit(loc_id,twomass_id)
+            for i in range(len(x)):
+                plate = x[i][0]
+                mjd = x[i][1]
+                fiber = x[i][2]
+                master.append((loc_id,twomass_id,plate,mjd,fiber))
+                j += 1
+                print('Appending %s to master' %j)
+            
+    with open(savefile,'w') as savefile:
+        
+        writer = csv.writer(savefile,delimiter = '\t')
+        writer.writerow(('Location ID','2Mass ID','Plate','MJD','Fiber'))
+        for i in range(len(master)):
+            writer.writerow((master[i][0],master[i][1],
+                            master[i][2],master[i][3],master[i][4]))
+            print('Writing row %s' %i)
+
+
+def Catalog_Update():
+    #add stuff here to update the catalog, reading and writing to a new file instead of running it again
+    return blah
+
 def find_nearest(array,value):
     from numpy import abs
     index = (abs(array-value)).argmin()
     return index
+
+def apStar_to_apVisit(locid,twomassid):
+    import apogee.tools.read as apread
+
+    header = apread.apStar(locid,twomassid,ext=0,header=True)
+
+    visits = header[1]['NVISITS']
+    array = []
+    for i in range(visits):
+        x = i+1
+        SFILE = 'SFILE%s' % x
+        plate = header[1][SFILE][11:15]
+        MJD = header[1][SFILE][16:21]
+        fiber = header[1][SFILE][22:25]
+        array.append((int(plate),int(MJD),int(fiber),int(visits)))
+    return array
+
 def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
     import numpy as np
     import apogee.tools.read as apread
     from astropy.io import fits
+    import functions
 
     #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
 
     spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
     wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
-    header = apread.apStar(4586,'2M03434449+3143092',ext=0,header=True)
 
     #Importing header via astropy--------------------------------------------------------------------------------------------------------------------|
+    filename = functions.File_Path(plateid,MJD,fiber)
+    main_header = fits.open(filename)
 
-    main_header = fits.open(
-        '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/6218/56168/apVisit-r6-6218-56168-148.fits'
-        )
     #Barycentric Correction--------------------------------------------------------------------------------------------------------------------------|
     
     #vbcstring = 'BC' + str(1) Somehow need to figure out which visit this MJD applies to
     vbc = main_header[0].header['BC']
-    observed_wavelength,shift = Barycentric_Correction(emission_line,vbc)
+    observed_wavelength,shift,rest_wavelength = Barycentric_Correction(emission_line,vbc)
     
     #Equivalent Width Calculation--------------------------------------------------------------------------------------------------------------------|
 
     #Finding the centerline and checking that it matches the peak in the window
     centerline = find_nearest(wave,observed_wavelength) #Finds the closest element of wave for our observed peak
-    centerline_check = Max_Flux_Check(spec,centerline)
+    centerline_check = Max_Flux_Check(wave,spec,centerline)
 
     if spec[centerline] != spec[centerline_check[1]]:
         print('The centerline has changed from ' + str(centerline) + ' to ' + str(centerline_check[1]) + ' with a new flux of ' + str(centerline_check[0]) + 
@@ -64,8 +125,38 @@ def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
         EqW_rounded = round(EqW1/Fluxcontinuum,5)
         EqW = EqW1/Fluxcontinuum
     
-    return EqW,EqW_rounded,vbc
+    return EqW,EqW_rounded,vbc,Fluxcontinuum,centerline,shift
  
+def Br_Equiv_Width_Plotter(plateid,MJD,fiber,emission_line):
+    import numpy as np
+    import apogee.tools.read as apread
+    from astropy.io import fits
+    import matplotlib.pyplot as plt
+    import functions
+
+    #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
+
+    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
+    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
+
+    #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
+    EqW,EqW_rounded,vbc,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
+
+    #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
+    
+    fig,ax = plt.subplots(figsize=(16,8))
+    plt.plot(wave+shift,spec,linewidth=2.5,label='Shifted')
+    #plt.plot(Lambda,spec1,linewidth=2.5,label='Unshifted')
+    plt.axhline(y=Fluxcontinuum,ls='dashed',color='black')
+    plt.axvline(x=wave[centerline]+shift,ls='dashed',color='r',label='Rest Emission')
+    #plt.axvline(calculated_point2,ls=':',color='r',label='Star Emission')
+    plt.legend(loc=1,prop={'size':18})
+    plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
+    plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
+    plt.xlim(wave[centerline]-40,wave[centerline]+40)
+    #plt.ylim(bottom_limit,top_limit)
+    ax.tick_params(axis='both', labelsize=20)   
+    #plt.show()
 
 def Barycentric_Correction(emission_line,vbc):
 
@@ -88,15 +179,19 @@ def Barycentric_Correction(emission_line,vbc):
 
     #Returns-----------------------------------------------------------------------------------------------------------------------------------------|
 
-    return observed_wavelength,shift
+    return observed_wavelength,shift,rest_wavelength
 
-def Max_Flux_Check(array,centerline):
-    
-    array = array[centerline-165:centerline+165]
-    y = max(array)
-    z = array.tolist().index(y)
-    z = z + centerline - 165
-    return y,z
+def Max_Flux_Check(x_axis,y_axis,centerline):
+    import functions
+    c = 299792.458
+    v_window = 500
+    right_shift = x_axis[centerline]*(1+(v_window/c))
+    left_shift = x_axis[centerline]*(1-(v_window/c))
+    leftwindow = functions.find_nearest(x_axis,left_shift)
+    rightwindow = functions.find_nearest(x_axis,right_shift)
+    y_max = max(y_axis[leftwindow:rightwindow])
+    z = y_axis.tolist().index(y_max)
+    return y_max,z
 
 
 def Brackett_Ratios(plateid,mjd,fiber):
@@ -153,8 +248,11 @@ def File_Path(plateid,mjd,fiber):
     import os
 
     #Creating file path------------------------------------------------------------------------------------------------------------------------------|
-
-    server = '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
+    '''
+    Notes:
+        - Need to rework this to include Location ID from master list
+    '''
+    server = '/Volumes/CoveyData-1/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
     plate = str(plateid)
     MJD = str(mjd)
     fiber_num = str(fiber)
