@@ -1,4 +1,3 @@
-
 def apVisit_Catalog_Output(filename,savefile):
     '''
     Notes:
@@ -61,7 +60,7 @@ def apStar_to_apVisit(locid,twomassid):
         plate = header[1][SFILE][11:15]
         MJD = header[1][SFILE][16:21]
         fiber = header[1][SFILE][22:25]
-        array.append((int(plate),int(MJD),int(fiber),int(visits)))
+        array.append((int(plate),int(MJD),fiber,int(visits)))
     return array
 
 def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
@@ -154,7 +153,7 @@ def Br_Equiv_Width_Plotter(plateid,MJD,fiber,emission_line):
     plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
     plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
     plt.xlim(wave[centerline]-40,wave[centerline]+40)
-    #plt.ylim(bottom_limit,top_limit)
+    plt.ylim(Fluxcontinuum-(1/2)*(spec[centerline]-Fluxcontinuum),Fluxcontinuum+2*(spec[centerline]-Fluxcontinuum))
     ax.tick_params(axis='both', labelsize=20)   
     #plt.show()
 

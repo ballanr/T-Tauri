@@ -30,7 +30,12 @@ for i in range(x[0][3]):
 #    '/Users/ballanr/Desktop/Research/test_visit.csv',
 #    'testest.csv')
 
-x = functions.apVisit_Catalog_Output(
-    '/Users/ballanr/Desktop/Research/test_visits.csv'
-    ,'Visits.csv')
+#x = functions.apVisit_Catalog_Output(
+#    '/Users/ballanr/Desktop/Research/test_visits.csv'
+#    ,'Visits.csv')
 
+x = functions.apStar_to_apVisit(4617,'2M06450343-0034140')
+print(x[0])
+for i in range(len(x)):
+    y = functions.Br_Equiv_Width_Plotter(x[i][0],x[i][1],x[i][2],11)
+    plt.savefig('/Users/ballanr/Desktop/Test/blahh %s.png' % i)
