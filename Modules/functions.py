@@ -61,7 +61,7 @@ def apStar_to_apVisit(locid,twomassid):
         MJD = header[1][SFILE][16:21]
         fiber = header[1][SFILE][22:25]
         array.append((int(plate),int(MJD),fiber,int(visits)))
-    return array
+    return array,locid,twomassid
 
 def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
     import numpy as np
@@ -142,7 +142,7 @@ def Br_Equiv_Width_Plotter(plateid,MJD,fiber,emission_line):
     EqW,EqW_rounded,vbc,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
 
     #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
-    
+    title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
     fig,ax = plt.subplots(figsize=(16,8))
     plt.plot(wave+shift,spec,linewidth=2.5,label='Shifted')
     #plt.plot(Lambda,spec1,linewidth=2.5,label='Unshifted')
@@ -152,6 +152,7 @@ def Br_Equiv_Width_Plotter(plateid,MJD,fiber,emission_line):
     plt.legend(loc=1,prop={'size':18})
     plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
     plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
+    plt.suptitle(title)
     plt.xlim(wave[centerline]-40,wave[centerline]+40)
     plt.ylim(Fluxcontinuum-(1/2)*(spec[centerline]-Fluxcontinuum),Fluxcontinuum+2*(spec[centerline]-Fluxcontinuum))
     ax.tick_params(axis='both', labelsize=20)   
@@ -183,7 +184,7 @@ def Barycentric_Correction(emission_line,vbc):
 def Max_Flux_Check(x_axis,y_axis,centerline):
     import functions
     c = 299792.458
-    v_window = 500
+    v_window = 100
     right_shift = x_axis[centerline]*(1+(v_window/c))
     left_shift = x_axis[centerline]*(1-(v_window/c))
     leftwindow = functions.find_nearest(x_axis,left_shift)
@@ -472,3 +473,39 @@ def SB_CSV(savefile):
             plt.scatter(T,b[i])
         plt.legend(bbox_to_anchor=(1,1))
         plt.show()
+
+def hundred_plotter(filename):
+    import csv
+    import functions
+    import matplotlib.pyplot as plt
+
+    with open(filename) as csvfile:
+
+        reader = csv.reader(csvfile,delimiter = '\t')
+        i = 0
+        x = []
+        for row in reader:
+            if i < 102:
+                x.append(row)
+                i += 1
+            else:
+                break
+    #return x
+    print(len(x))
+    for k in range(len(x)):
+        if k != 0:
+            line = 11
+            plate = int(x[k][2])
+            MJD = int(x[k][3])
+            if len(x[k][4]) == 3:
+                fiber = x[k][4]
+            if len(x[k][4]) == 2:
+                fiber = '0'+x[k][4]
+            if len(x[k][4]) == 1:
+                fiber = '00'+x[k][4]
+            y = functions.Br_Equiv_Width_Plotter(plate,MJD,fiber,line)
+            print(fiber)
+            title = x[k][2]+'-'+x[k][3]+'-'+fiber
+            plt.savefig('/Users/ballanr/Desktop/Test/'+title+'-'+str(line)+'.png')
+            plt.close()
+    
