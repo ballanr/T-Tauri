@@ -34,8 +34,11 @@ for i in range(x[0][3]):
 #    '/Users/ballanr/Desktop/Research/test_visits.csv'
 #    ,'Visits.csv')
 
-x = functions.apStar_to_apVisit(4617,'2M06450343-0034140')
-print(x[0])
-for i in range(len(x)):
-    y = functions.Br_Equiv_Width_Plotter(x[i][0],x[i][1],x[i][2],11)
-    plt.savefig('/Users/ballanr/Desktop/Test/blahh %s.png' % i)
+x,locid,twomassid = functions.apStar_to_apVisit(4586,'2M03434449+3143092')
+plateid = x[1][0]
+MJD = x[1][1]
+fiber = x[1][2]
+emission_line = 12
+x = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
+#y = functions.Skyline_Plotter(plateid,MJD,fiber,emission_line)
+print(x)

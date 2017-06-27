@@ -82,6 +82,7 @@ def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
     
     #vbcstring = 'BC' + str(1) Somehow need to figure out which visit this MJD applies to
     vbc = main_header[0].header['BC']
+    vhelio = main_header[0].header['VHELIO']
     observed_wavelength,shift,rest_wavelength = Barycentric_Correction(emission_line,vbc)
     
     #Equivalent Width Calculation--------------------------------------------------------------------------------------------------------------------|
@@ -89,11 +90,12 @@ def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
     #Finding the centerline and checking that it matches the peak in the window
     centerline = find_nearest(wave,observed_wavelength) #Finds the closest element of wave for our observed peak
     centerline_check = Max_Flux_Check(wave,spec,centerline)
-
-    if spec[centerline] != spec[centerline_check[1]]:
-        print('The centerline has changed from ' + str(centerline) + ' to ' + str(centerline_check[1]) + ' with a new flux of ' + str(centerline_check[0]) + 
-        ' from ' + str(spec[centerline]) + '.')
-        centerline = centerline_check[1]
+    
+    '''if emission_line == 11:
+        if spec[centerline] != spec[centerline_check[1]]:
+            print('The centerline has changed from ' + str(centerline) + ' to ' + str(centerline_check[1]) + ' with a new flux of ' + str(centerline_check[0]) + 
+            ' from ' + str(spec[centerline]) + '.')
+            centerline = centerline_check[1]'''
     
 
     L1 = centerline - 240 # ~ 56 Angstroms
@@ -124,12 +126,11 @@ def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
         EqW_rounded = round(EqW1/Fluxcontinuum,5)
         EqW = EqW1/Fluxcontinuum
     
-    return EqW,EqW_rounded,vbc,Fluxcontinuum,centerline,shift
+    return EqW,EqW_rounded,vbc,vhelio,Fluxcontinuum,centerline,shift
  
 def Br_Equiv_Width_Plotter(plateid,MJD,fiber,emission_line):
     import numpy as np
     import apogee.tools.read as apread
-    from astropy.io import fits
     import matplotlib.pyplot as plt
     import functions
 
@@ -139,22 +140,83 @@ def Br_Equiv_Width_Plotter(plateid,MJD,fiber,emission_line):
     wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
 
     #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
-    EqW,EqW_rounded,vbc,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
+    EqW,EqW_rounded,vbc,vhelio,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
 
     #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
     title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
     fig,ax = plt.subplots(figsize=(16,8))
     plt.plot(wave+shift,spec,linewidth=2.5,label='Shifted')
-    #plt.plot(Lambda,spec1,linewidth=2.5,label='Unshifted')
+    
     plt.axhline(y=Fluxcontinuum,ls='dashed',color='black')
     plt.axvline(x=wave[centerline]+shift,ls='dashed',color='r',label='Rest Emission')
-    #plt.axvline(calculated_point2,ls=':',color='r',label='Star Emission')
+    
+    plt.legend(loc=1,prop={'size':18})
+    plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
+    plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
+    plt.suptitle(title,fontsize = 20)
+    plt.xlim(wave[centerline]-40,wave[centerline]+40)
+    plt.ylim(Fluxcontinuum-(1/2)*(spec[centerline]-Fluxcontinuum),Fluxcontinuum+2*(spec[centerline]-Fluxcontinuum))
+    ax.tick_params(axis='both', labelsize=20)   
+    #plt.show()
+def Unshifted_Plotter(plateid,MJD,fiber,emission_line):
+    import numpy as np
+    import apogee.tools.read as apread
+    import matplotlib.pyplot as plt
+    import functions
+
+    #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
+
+    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
+    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
+
+    #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
+    EqW,EqW_rounded,vbc,vhelio,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
+
+    #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
+    title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
+    fig,ax = plt.subplots(figsize=(16,8))
+    plt.plot(wave,spec,linewidth=2.5,label='Not Shifted')
+    
+    plt.axhline(y=Fluxcontinuum,ls='dashed',color='black')
+    plt.axvline(x=wave[centerline]+shift,ls='dashed',color='r',label='Rest Emission')
+    
+    plt.legend(loc=1,prop={'size':18})
+    plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
+    plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
+    plt.suptitle(title,fontsize = 20)
+    plt.xlim(wave[centerline]-40,wave[centerline]+40)
+    plt.ylim(Fluxcontinuum-(1/2)*(spec[centerline]-Fluxcontinuum),Fluxcontinuum+2*(spec[centerline]-Fluxcontinuum))
+    ax.tick_params(axis='both', labelsize=20)   
+    #plt.show()
+def Skyline_Plotter(plateid,MJD,fiber,emission_line):
+    import numpy as np
+    import apogee.tools.read as apread
+    from astropy.io import fits
+    import matplotlib.pyplot as plt
+    import functions
+
+    #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
+    
+    spec = apread.apVisit(plateid,MJD,fiber,ext=5,header=False)
+    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
+
+    #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
+    EqW,EqW_rounded,vbc,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
+
+    #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
+    title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
+    fig,ax = plt.subplots(figsize=(16,8))
+    plt.plot(wave,spec,linewidth=2.5,label='Shifted')
+    
+    plt.axhline(y=Fluxcontinuum,ls='dashed',color='black')
+    plt.axvline(x=wave[centerline]+shift,ls='dashed',color='r',label='Rest Emission')
+    
     plt.legend(loc=1,prop={'size':18})
     plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
     plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
     plt.suptitle(title)
     plt.xlim(wave[centerline]-40,wave[centerline]+40)
-    plt.ylim(Fluxcontinuum-(1/2)*(spec[centerline]-Fluxcontinuum),Fluxcontinuum+2*(spec[centerline]-Fluxcontinuum))
+    plt.ylim(0,3*Fluxcontinuum)
     ax.tick_params(axis='both', labelsize=20)   
     #plt.show()
 
