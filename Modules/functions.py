@@ -7,7 +7,7 @@ def apVisit_Catalog_Output(filename,savefile):
     import csv
 
     #Setting up Dictionary----------------------------------------------------------------------------|
-    apVisit_Dict = {}
+    apVisit_Dict = {} #Not used right now. Will shift to it eventually.
 
     #Creating List------------------------------------------------------------------------------------|
     master = []
@@ -627,3 +627,54 @@ def Uniqueness_Filter(file, locid, twomassid, plateid):
             state = 2
     
     return state
+
+def Equivalent_Width_Error(plateid,MJD,fiber):
+
+    import apogee.tools.read as apread
+
+    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
+    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
+
+    filename = functions.File_Path(plateid,MJD,fiber)
+    main_header = fits.open(filename)
+
+    vbc = main_header[0].header['BC']
+    vhelio = main_header[0].header['VHELIO']
+    observed_wavelength,shift,rest_wavelength = Barycentric_Correction(emission_line,vbc)
+
+    '''
+    W_lambda = equivalent width, milli-Angstroms
+    lambda1, lambda2 = limits of integration for line profile, Angstroms
+    l = line signal, flux units
+    c = continuum signal, flux units
+    del_lambda = linear dispersion/plate scale, milli-Angstroms per data point
+    r = residual intensity, l/c
+    n_l = number of points between lambda1 and lambda2
+    n_c = number of selected continuum points
+    SNR = signal-to-noise ratio
+    '''
+    centerline = find_nearest(wave,observed_wavelength) #Finds the closest element of wave for our observed peak
+
+    L1 = centerline - 240 # ~ 56 Angstroms
+    L2 = centerline - 150 # ~ 35 Angstroms
+    R1 = centerline + 150
+    R2 = centerline + 240
+
+    lambda1 = wave[L2]
+    lambda2 = wave[R1]
+    n_l = R1 - L2
+    del_lambda = (lambda2-lambda1) / n_l
+
+    l = spec[L2:R1]
+    leftc = np.sum(spec[L1:L2])
+    rightc = np.sum(spec[R1:R2])
+    c = (leftc + rightc) / ((L2 - L1) + (R2 - R1))
+    
+    summed = 0
+
+    for element in l:
+
+        summed += l[element] / c
+
+    W_lambda = (n_l * del_lambda) - del_lambda * sum(l/c)
+    sig_squared = n_l * ((del_lambda ** 2)/(SNR ** 2)) * (r/n_c) * (r + n_c)
