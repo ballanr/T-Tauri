@@ -201,7 +201,7 @@ def Skyline_Plotter(plateid,MJD,fiber,emission_line):
     wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
 
     #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
-    EqW,EqW_rounded,vbc,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
+    EqW,EqW_rounded,vbc,vhelio,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
 
     #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
     title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
@@ -214,7 +214,7 @@ def Skyline_Plotter(plateid,MJD,fiber,emission_line):
     plt.legend(loc=1,prop={'size':18})
     plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
     plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
-    plt.suptitle(title)
+    plt.suptitle(title,fontsize = 20)
     plt.xlim(wave[centerline]-40,wave[centerline]+40)
     plt.ylim(0,3*Fluxcontinuum)
     ax.tick_params(axis='both', labelsize=20)   
@@ -537,6 +537,7 @@ def SB_CSV(savefile):
         plt.show()
 
 def hundred_plotter(filename):
+
     import csv
     import functions
     import matplotlib.pyplot as plt
@@ -570,4 +571,59 @@ def hundred_plotter(filename):
             title = x[k][2]+'-'+x[k][3]+'-'+fiber
             plt.savefig('/Users/ballanr/Desktop/Test/'+title+'-'+str(line)+'.png')
             plt.close()
+
+def Visits_Filter(filename,savefile):
+    import csv
+    import functions
+    uniques = [[str(4157),'2M06451058+0124210',str(5513),str(55852),str(99)]]
+    g = 1
+    with open(filename) as csvfile:
+
+        reader = csv.reader(csvfile,delimiter='\t') 
+        next(reader, None)  # skip the headers
+        for row in reader:
+            locid = row[0]
+            twomassid = row[1]
+            plateid = row[2]
+            x = functions.Uniqueness_Filter(uniques,locid, twomassid, plateid)
+            
+            
+            if x == 1:
+                #print('Same plate.')
+                uniques.append(row)
+                print('%s unique visits' %g)
+                g += 1
+            elif x == 2:
+                #print('Doesn\'t exist yet.')
+                uniques.append(row)
+                print('%s unique visits' %g)
+                g += 1
+
+    with open(savefile,'w') as savefile:
+        
+        writer = csv.writer(savefile,delimiter = '\t')
+        
+        writer.writerow(('Location ID','2Mass ID','Plate','MJD','Fiber'))
+        
+        for i in range(len(uniques)):
+            if i != 0:
+                writer.writerow((uniques[i][0],uniques[i][1],uniques[i][2],uniques[i][3],uniques[i][4]))
+                print('Writing row %s' %i)
+
+def Uniqueness_Filter(file, locid, twomassid, plateid):
+    state = 0
+    for a,b,c,d,e in file:
+
+        if a == locid and b == twomassid:
+            if a == locid and b == twomassid and c == plateid:
+                #print(locid, twomassid, plateid)
+                state = 1
+            
+            else:
+                state = 0
+        
+        else:
+            #print('Newp!')
+            state = 2
     
+    return state
