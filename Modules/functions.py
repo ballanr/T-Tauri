@@ -572,63 +572,88 @@ def hundred_plotter(filename):
             plt.savefig('/Users/ballanr/Desktop/Test/'+title+'-'+str(line)+'.png')
             plt.close()
 
-def Visits_Filter(filename,savefile):
+def twomass_uniqueness(filename,savefile):
     import csv
     import functions
-    uniques = [[str(4157),'2M06451058+0124210',str(5513),str(55852),str(99)]]
+    import math
+
+    uniques = [[str(5000),'2M06221099+0124210']]
+    nonuniques = []
+    
     g = 1
+    gg = 151751
+
     with open(filename) as csvfile:
 
         reader = csv.reader(csvfile,delimiter='\t') 
         next(reader, None)  # skip the headers
         for row in reader:
-            locid = row[0]
-            twomassid = row[1]
-            plateid = row[2]
-            x = functions.Uniqueness_Filter(uniques,locid, twomassid, plateid)
-            
+            locid = row[1]
+            twomassid = row[0]
+            x = functions.Uniqueness_Filter(uniques, locid, twomassid)
             
             if x == 1:
-                #print('Same plate.')
-                uniques.append(row)
-                print('%s unique visits' %g)
+                uniques.append((row[0],row[1]))
+                #print('Unique visit %s' %g)
                 g += 1
-            elif x == 2:
-                #print('Doesn\'t exist yet.')
-                uniques.append(row)
-                print('%s unique visits' %g)
+
+            elif x == 0:
+                uniques.append((row[0],row[1]))
+                nonuniques.append((row[0],row[1]))
+                #print('Non-unique visit %s' %g)
                 g += 1
+            
+            percent = (g/gg)*100
+            numbertimes = math.floor(percent)
+
+            hashes = '#' * int(numbertimes)
+            
+            spaces = ' '* (100 - int(numbertimes))
+
+            print('Sorting through files: %.5f done ['%percent + hashes + str(spaces) + ']',end='\r',flush = True)
 
     with open(savefile,'w') as savefile:
         
         writer = csv.writer(savefile,delimiter = '\t')
         
-        writer.writerow(('Location ID','2Mass ID','Plate','MJD','Fiber'))
+        writer.writerow(('Location ID','2Mass ID'))
         
-        for i in range(len(uniques)):
+        for i in range(len(nonuniques)):
             if i != 0:
-                writer.writerow((uniques[i][0],uniques[i][1],uniques[i][2],uniques[i][3],uniques[i][4]))
-                print('Writing row %s' %i)
+                percent = (i/len(nonuniques))*100
+                numbertimes = math.floor(percent)
+                hashes = '#' * int(numbertimes)
+                spaces = ' '* (100 - int(numbertimes))
 
-def Uniqueness_Filter(file, locid, twomassid, plateid):
+                writer.writerow((nonuniques[i][1],nonuniques[i][0]))
+
+                print('Writing rows: %.5f done ['%percent + hashes + str(spaces) + ']',end='\r',flush = True)
+    
+    return uniques,nonuniques
+
+def Uniqueness_Filter(array, locid, twomassid):
+    
     state = 0
-    for a,b,c,d,e in file:
+    
+    for a,b in array:
 
-        if a == locid and b == twomassid:
-            if a == locid and b == twomassid and c == plateid:
-                #print(locid, twomassid, plateid)
-                state = 1
-            
-            else:
-                state = 0
+        if a != locid and b != twomassid:
+            state = 1
         
-        else:
-            #print('Newp!')
-            state = 2
+        elif a != locid and b == twomassid:
+            state = 0
     
     return state
 
 def Equivalent_Width_Error(plateid,MJD,fiber):
+
+
+    '''
+    Notes:
+
+        - Work on this later
+    
+    '''
 
     import apogee.tools.read as apread
 
@@ -678,3 +703,15 @@ def Equivalent_Width_Error(plateid,MJD,fiber):
 
     W_lambda = (n_l * del_lambda) - del_lambda * sum(l/c)
     sig_squared = n_l * ((del_lambda ** 2)/(SNR ** 2)) * (r/n_c) * (r + n_c)
+
+
+    '''
+    with open(filename) as csvfile:
+
+        reader = csv.reader(csvfile,delimiter='\t')
+        
+        for row in reader:
+
+            for a,b,c,d in row:
+
+                if a == '''
