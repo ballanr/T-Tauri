@@ -83,7 +83,7 @@ def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
     #vbcstring = 'BC' + str(1) Somehow need to figure out which visit this MJD applies to
     vbc = main_header[0].header['BC']
     vhelio = main_header[0].header['VHELIO']
-    observed_wavelength,shift,rest_wavelength = Barycentric_Correction(emission_line,vbc)
+    observed_wavelength,shift,rest_wavelength = functions.Barycentric_Correction(emission_line,vbc)
     
     #Equivalent Width Calculation--------------------------------------------------------------------------------------------------------------------|
 
@@ -211,7 +211,7 @@ def Skyline_Plotter(plateid,MJD,fiber,emission_line):
     plt.axhline(y=Fluxcontinuum,ls='dashed',color='black')
     plt.axvline(x=wave[centerline]+shift,ls='dashed',color='r',label='Rest Emission')
     
-    plt.legend(loc=1,prop={'size':18})
+    
     plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
     plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
     plt.suptitle(title,fontsize = 20)
@@ -314,7 +314,8 @@ def File_Path(plateid,mjd,fiber):
     Notes:
         - Need to rework this to include Location ID from master list
     '''
-    server = '/Volumes/CoveyData-1/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
+    #server = '/Volumes/CoveyData-1/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
+    server = '/Users/ballanr/Desktop/SummerResearch/dr13/apogee/spectro/redux/r6/apo25m/'
     plate = str(plateid)
     MJD = str(mjd)
     fiber_num = str(fiber)
@@ -715,3 +716,220 @@ def Equivalent_Width_Error(plateid,MJD,fiber):
             for a,b,c,d in row:
 
                 if a == '''
+
+def Skylines_Handler(plateid,MJD,fiber):
+    import functions
+    import apogee.tools.read as apread
+    import numpy as np
+    from astropy.io import fits
+    '''
+    Notes:
+    '''
+
+    OH_Lines = [16840.481,16802.368,16414.737,16388.492,16128.608,16079.753,15897.211,
+                15890.033,15869.307,15862.489,15702.539,15597.631,15570.159,15546.141,
+                15540.945,15539.711,15474.212,15462.125,15432.156,15430.163,15332.402,
+                15287.789,15240.954,15187.140]
+
+    averages = []
+    windows = []
+
+    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
+    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
+
+
+    #Linear Interpolation-----------------------------------------------------------------------------------------------|
+
+    for i in range(len(OH_Lines)):
+
+        x1 = functions.find_nearest(wave,OH_Lines[i]-1.5)
+        x2 = functions.find_nearest(wave,OH_Lines[i]+1.5)
+        
+        windows.append((x1,x2))
+    
+    filename = '/Users/ballanr/Desktop/SummerResearch/dr13/apogee/spectro/redux/r6/apo25m/6218/56172/apVisit-r6-6218-56172-094.fits'
+    f = fits.open(filename,mode='update')
+
+    fspec = f[1]
+    
+    for i in range(len(windows)):
+        
+        if i != 14 and i != 18 and i != 15 and i != 19:
+
+            if windows[i][0] > 8192:
+                x = int(windows[i][0]) - 8192
+                y = int(windows[i][1]) - 8192
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i][0])
+                xleft = wave[windows[i][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            elif windows[i][0] < 8192 and windows[i][0] > 4096:
+                x = int(windows[i][0]) - 4096
+                y = int(windows[i][1]) - 4096
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i][0])
+                xleft = wave[windows[i][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            else:
+                x = int(windows[i][0])
+                y = int(windows[i][1])
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i][0])
+                xleft = wave[windows[i][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            print(slope)
+            f.flush()
+        
+        elif i == 14:
+            
+            #set left bound to be 15s left bound and the right bound to 16s then proceed with calculation
+            if windows[i][0] > 8192:
+                x = int(windows[i+1][0]) - 8192
+                y = int(windows[i][1]) - 8192
+                xx = 4096 - x
+                yy = 4096 - y
+    
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft) 
+    
+                for k in range(xx-yy):
+
+                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft 
+
+            elif windows[i][0] < 8192 and windows[i][0] > 4096:
+                x = int(windows[i+1][0]) - 4096
+                y = int(windows[i][1]) - 4096
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+            
+            else:
+                x = int(windows[i+1][0])
+                y = int(windows[i][1])
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            print(slope)
+            f.flush()
+        elif i == 18:
+            
+            #set left bound to be 15s left bound and the right bound to 16s then proceed with calculation
+            if windows[i][0] > 8192:
+                x = int(windows[i+1][0]) - 8192
+                y = int(windows[i][1]) - 8192
+                xx = 4096 - x
+                yy = 4096 - y
+    
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft) 
+    
+                for k in range(xx-yy):
+
+                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft 
+
+            elif windows[i][0] < 8192 and windows[i][0] > 4096:
+                x = int(windows[i+1][0]) - 4096
+                y = int(windows[i][1]) - 4096
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+            
+            else:
+                x = int(windows[i+1][0])
+                y = int(windows[i][1])
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            print(slope)
+            f.flush()
+    f.close()
+
+
+
