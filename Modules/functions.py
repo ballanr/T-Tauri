@@ -37,11 +37,6 @@ def apVisit_Catalog_Output(filename,savefile):
                             master[i][2],master[i][3],master[i][4]))
             print('Writing row %s' %i)
 
-
-def Catalog_Update():
-    #add stuff here to update the catalog, reading and writing to a new file instead of running it again
-    return blah
-
 def find_nearest(array,value):
     from numpy import abs
     index = (abs(array-value)).argmin()
@@ -63,7 +58,7 @@ def apStar_to_apVisit(locid,twomassid):
         array.append((int(plate),int(MJD),fiber,int(visits)))
     return array,locid,twomassid
 
-def Br_Equiv_Width(plateid,MJD,fiber,emission_line):
+def Br_Equiv_Width_Apogee(plateid,MJD,fiber,emission_line):
     import numpy as np
     import apogee.tools.read as apread
     from astropy.io import fits
@@ -314,8 +309,8 @@ def File_Path(plateid,mjd,fiber):
     Notes:
         - Need to rework this to include Location ID from master list
     '''
-    #server = '/Volumes/CoveyData-1/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
-    server = '/Users/ballanr/Desktop/SummerResearch/dr13/apogee/spectro/redux/r6/apo25m/'
+    server = '/Volumes/CoveyData-1/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
+    #server = '/Users/ballanr/Desktop/SummerResearch/dr13/apogee/spectro/redux/r6/apo25m/'
     plate = str(plateid)
     MJD = str(mjd)
     fiber_num = str(fiber)
@@ -578,20 +573,20 @@ def twomass_uniqueness(filename,savefile):
     import functions
     import math
 
-    uniques = [[str(5000),'2M06221099+0124210']]
-    nonuniques = []
+    uniques = [[str(4614),'2M05412754-0646074']] #Setting up array to check for unique 2M IDs
+    nonuniques = [] #The array for storing non-unqiue 2M IDs
     
     g = 1
-    gg = 151751
+    gg = 579468
 
     with open(filename) as csvfile:
 
         reader = csv.reader(csvfile,delimiter='\t') 
         next(reader, None)  # skip the headers
         for row in reader:
-            locid = row[1]
-            twomassid = row[0]
-            x = functions.Uniqueness_Filter(uniques, locid, twomassid)
+            locid = row[0]
+            twomassid = row[1]
+            x = functions.Uniqueness_Filter(uniques, locid, twomassid) #Checks the location ID and 2M ID against the growing list of uniques
             
             if x == 1:
                 uniques.append((row[0],row[1]))
@@ -717,7 +712,7 @@ def Equivalent_Width_Error(plateid,MJD,fiber):
 
                 if a == '''
 
-def Skylines_Handler(plateid,MJD,fiber):
+def Skylines_Handler_Apogee(plateid,MJD,fiber,filename):
     import functions
     import apogee.tools.read as apread
     import numpy as np
@@ -747,7 +742,7 @@ def Skylines_Handler(plateid,MJD,fiber):
         
         windows.append((x1,x2))
     
-    filename = '/Users/ballanr/Desktop/SummerResearch/dr13/apogee/spectro/redux/r6/apo25m/6218/56172/apVisit-r6-6218-56172-094.fits'
+    
     f = fits.open(filename,mode='update')
 
     fspec = f[1]
@@ -931,5 +926,531 @@ def Skylines_Handler(plateid,MJD,fiber):
             f.flush()
     f.close()
 
+def Skylines_Handler(plateid,MJD,fiber,filename):
+    import functions
+    import apogee.tools.read as apread
+    import numpy as np
+    from astropy.io import fits
+    '''
+    Notes: 
+        - Need to change this to work with new output files (the ascending order versions)
+        - indexes need to be reversed since the arrays are left to right 
+        - can delete this 
+    '''
+
+    OH_Lines = [16840.481,16802.368,16414.737,16388.492,16128.608,16079.753,15897.211,
+                15890.033,15869.307,15862.489,15702.539,15597.631,15570.159,15546.141,
+                15540.945,15539.711,15474.212,15462.125,15432.156,15430.163,15332.402,
+                15287.789,15240.954,15187.140]
+
+    averages = []
+    windows = []
+
+    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
+    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
 
 
+    #Linear Interpolation-----------------------------------------------------------------------------------------------|
+
+    for i in range(len(OH_Lines)):
+
+        x1 = functions.find_nearest(wave,OH_Lines[i]-1.5)
+        x2 = functions.find_nearest(wave,OH_Lines[i]+1.5)
+        
+        windows.append((x1,x2))
+    
+    
+    f = fits.open(filename,mode='update')
+
+    fspec = f[1]
+    
+    for i in range(len(windows)):
+        
+        if i != 14 and i != 18 and i != 15 and i != 19:
+
+            if windows[i][0] > 8192:
+                x = int(windows[i][0]) - 8192
+                y = int(windows[i][1]) - 8192
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i][0])
+                xleft = wave[windows[i][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            elif windows[i][0] < 8192 and windows[i][0] > 4096:
+                x = int(windows[i][0]) - 4096
+                y = int(windows[i][1]) - 4096
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i][0])
+                xleft = wave[windows[i][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            else:
+                x = int(windows[i][0])
+                y = int(windows[i][1])
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i][0])
+                xleft = wave[windows[i][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            print(slope)
+            f.flush()
+        
+        elif i == 14:
+            
+            #set left bound to be 15s left bound and the right bound to 16s then proceed with calculation
+            if windows[i][0] > 8192:
+                x = int(windows[i+1][0]) - 8192
+                y = int(windows[i][1]) - 8192
+                xx = 4096 - x
+                yy = 4096 - y
+    
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft) 
+    
+                for k in range(xx-yy):
+
+                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft 
+
+            elif windows[i][0] < 8192 and windows[i][0] > 4096:
+                x = int(windows[i+1][0]) - 4096
+                y = int(windows[i][1]) - 4096
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+            
+            else:
+                x = int(windows[i+1][0])
+                y = int(windows[i][1])
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            print(slope)
+            f.flush()
+        elif i == 18:
+            
+            #set left bound to be 15s left bound and the right bound to 16s then proceed with calculation
+            if windows[i][0] > 8192:
+                x = int(windows[i+1][0]) - 8192
+                y = int(windows[i][1]) - 8192
+                xx = 4096 - x
+                yy = 4096 - y
+    
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft) 
+    
+                for k in range(xx-yy):
+
+                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft 
+
+            elif windows[i][0] < 8192 and windows[i][0] > 4096:
+                x = int(windows[i+1][0]) - 4096
+                y = int(windows[i][1]) - 4096
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+            
+            else:
+                x = int(windows[i+1][0])
+                y = int(windows[i][1])
+                xx = 4096 - x
+                yy = 4096 - y
+
+                x3 = int(windows[i+1][0])
+                xleft = wave[windows[i+1][0]]
+                xright = wave[windows[i][1]]
+                yleft = spec[windows[i+1][0]]
+                yright = spec[windows[i][1]]
+                slope = (yright - yleft) / (xright - xleft)
+
+
+                for k in range(xx-yy):
+
+                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
+
+            print(slope)
+            f.flush()
+    f.close()
+
+def New_Br_EqW_Calc(filename):
+
+    '''
+    To Do:
+        - read in the fits file
+        - remove skylines
+        - save a temporary file with array going from min to max
+        - run new file through calculator
+        - if EqW measurement is > 0:
+            - save wavelength and flux arrays as a text file
+            - write the values to the catalog
+                - every ~10 values or so also plot the corrected spectrum with uncorrected and save it
+    '''
+
+    import functions
+    from tempfile import NamedTemporaryFile
+    import shutil
+    import csv
+
+    tempfile = NamedTemporaryFile(delete=False)
+
+    with open(filename,'r+') as csvfile,tempfile:
+        reader = csv.reader(csvfile,delimiter=',')
+        writer = csv.writer(tempfile,delimiter=',')
+        next(reader, None)
+
+        for row in reader:
+            plateid = row[2]
+            mjd = row[3]
+            if len(row[4]) == 3:
+                fiber = str(row[4])
+            elif len(row[4]) == 2:
+                fiber = '0' + str(row[4]) 
+            else:
+                fiber = '00' + str(row[4])
+            
+            fitsfile = functions.File_Path(plateid,mjd,fiber) #This file gets passed to astropy to open in skylines to modify
+            print(fitsfile)
+            #skylines = functions.Skylines_Handler(plateid,mjd,fiber,fitsfile) 
+            #Need to change this so that it saves a new file but doesn't update the existing copy
+    
+    
+    '''        
+            writer.writerow((row,othervalues))
+
+    shutil.move(tempfile.name,filename)
+    '''
+
+def apVisit_Updated_Catalog(infile,start):
+
+    import functions
+    import pandas as pd
+    from astropy.io import fits as fits
+    import numpy as np
+    import itertools
+
+    x = pd.read_csv(infile,delimiter = '\t')
+    problems = []
+    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','Br 11 EqW','Br 12 EqW',
+       'Br 13 EqW','Br 14 EqW','Br 15 EqW','Br 16 EqW','Br 17 EqW','Br 18 EqW',
+       'Br 19 EqW','Br 20 EqW']
+    
+    df = pd.DataFrame(columns = cols)
+    g = 0
+    rowstart = start
+    rowend = start + 100000
+    for index,row in itertools.islice(x.iterrows(),rowstart,rowend):
+        try:
+            g+=1
+            loc = row['Location ID']
+            twomass = row['2Mass ID']
+            print(str(g))
+            plateid = row['Plate']
+            mjd = row['MJD']
+            if len(str(row['Fiber'])) == 3:
+                fiber = str(row['Fiber'])
+            elif len(str(row['Fiber'])) == 2:
+                fiber = '0' + str(row['Fiber']) 
+            else:
+                fiber = '00' + str(row['Fiber'])
+                    
+            fitsfile = functions.File_Path(plateid,mjd,fiber)
+
+            #this passes a filepath that astropy can open with fits, circumventing apogee entirely...
+            
+            openfile = fits.open(fitsfile)
+            vbc = openfile[0].header['BC']
+            c = 299792.458
+            lamshift = 1 + (vbc/c)
+            
+            fspec = openfile[1]
+            fwave = openfile[4]
+            wave = []
+            flux = []
+            
+            for i in range(len(fwave.data[2])):
+                wave.append(fwave.data[2][-i-1])
+                flux.append(fspec.data[2][-i-1])
+            for i in range(len(fwave.data[1])):
+                wave.append(fwave.data[1][-i-1])
+                flux.append(fspec.data[1][-i-1])
+            for i in range(len(fwave.data[0])):
+                wave.append(fwave.data[0][-i-1])
+                flux.append(fspec.data[0][-i-1])
+                
+            newflux = functions.OH_Skylines_Remover(wave,flux)
+            
+            #now we run equiv width calc
+            lines = [11,12,13,14,15,16,17,18,19,20]
+            EqW = []
+            equiv_check = 1000
+            
+            for i in range(10):
+                
+                equiv_width,fcontinuum,shift,rest_wavelength = functions.Br_EqW(wave,newflux,lines[i],vbc)
+                EqW.append(equiv_width)
+                
+                if i == 0:
+                    equiv_check = equiv_width
+                
+            wave = np.asarray(wave) * lamshift #check which direction shift is going
+            
+            if equiv_check > 1:
+                
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+
+                df.loc[len(df)+1] = data
+
+                df1 = pd.DataFrame(wave,columns=['Wavelength'])
+                df1['Flux'] = newflux
+                filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+                df1.to_csv('/Users/ballanr/Desktop/File Outputs/Wave and Flux/'+filename,index=False)
+            openfile.close()
+
+        except KeyError:
+            print('Row '+str(g)+' has no BC value...')
+            problems.append((loc,twomass,'KeyError'))
+            openfile.close()
+        
+        except FileNotFoundError:
+            print('Row '+str(g)+' doesn\'t exist...')
+            problems.append((loc,twomass,'FileNotFound'))
+
+    probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Problem Type'])
+    probs.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'-'+str(rowend)+' Problems.csv')
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'-'+str(rowend)+' Equivs.csv',index=False)
+
+def Br_EqW(wave,spec,line,vbc):
+    
+    import functions
+    import numpy as np
+    
+    wave = np.asarray(wave)
+    observed_wavelength,shift,rest_wavelength = functions.Barycentric_Correction(line,vbc)
+    
+    centerline = functions.find_nearest(wave,observed_wavelength)
+    
+    L1 = centerline - 240 # ~ 56 Angstroms
+    L2 = centerline - 151 # ~ 35 Angstroms
+    R1 = centerline + 150
+    R2 = centerline + 241
+
+    Fluxcontinuum = (np.sum(spec[L1:L2])+np.sum(spec[R1:R2])) / (len(spec[L1:L2])+len(spec[R1:R2]))
+    EqW1 = 0
+
+    if Fluxcontinuum == 0:
+
+        EqW1 = 0
+        EqW1_rounded = 0
+
+    if Fluxcontinuum != 0:
+
+        for i in range(L2,centerline):
+
+            left_area = (wave[i+1]-wave[i])*(spec[i+1]-Fluxcontinuum)-(1./2.)*(wave[i+1]-wave[i])*(spec[i+1]-spec[i])
+            EqW1 += left_area
+
+        for i in range(centerline,R1):
+
+            right_area = (wave[i+1]-wave[i])*(spec[i]-Fluxcontinuum)-(1./2.)*(wave[i+1]-wave[i])*(spec[i]-spec[i+1])
+            EqW1 += right_area
+
+        #EqW_rounded = round(EqW1/Fluxcontinuum,5)
+        EqW = EqW1/Fluxcontinuum
+    
+    return EqW,Fluxcontinuum,shift,rest_wavelength
+
+def OH_Skylines_Remover(wave,flux):
+    
+    import functions
+    import numpy as np
+    
+    OH_Lines = [15187.14,15240.954,15287.789,15332.402,15430.163,15432.156,15462.125,15474.212,
+                15539.711,15540.945,15546.141,15570.159,15597.631,15702.539,15862.489,15869.307,
+                15890.033,15897.211,16079.753,16128.608,16388.492,16414.737,16802.368,16840.481]
+    
+    windows = []
+    wave = np.asarray(wave)
+    
+    for i in range(len(OH_Lines)):
+        
+        lwindow = functions.find_nearest(wave,OH_Lines[i]-1.5)
+        rwindow = functions.find_nearest(wave,OH_Lines[i]+1.5)
+        
+        windows.append((lwindow,rwindow))
+    
+    for i in range(len(windows)):
+        
+        if i != 4 and i != 5 and i != 8 and i != 9:
+            
+            lwindowelement = int(windows[i][0])
+            rwindowelement = int(windows[i][1])
+            leftwindow = wave[windows[i][0]]
+            rightwindow = wave[windows[i][1]]
+            leftflux = flux[windows[i][0]]
+            rightflux = flux[windows[i][1]]
+        
+            slope = (rightflux - leftflux) / (rightwindow - leftwindow)
+        
+            for k in range(rwindowelement - lwindowelement):
+                fluxvalue = slope*(wave[lwindowelement+k] - leftwindow) + leftflux
+                flux[lwindowelement+k] = fluxvalue
+        
+        elif i == 4:
+            
+            lwindowelement = int(windows[i][0])
+            rwindowelement = int(windows[i+1][1])
+            leftwindow = wave[windows[i][0]]
+            rightwindow = wave[windows[i+1][1]]
+            leftflux = flux[windows[i][0]]
+            rightflux = flux[windows[i+1][1]]
+        
+            slope = (rightflux - leftflux) / (rightwindow - leftwindow)
+        
+            for k in range(rwindowelement - lwindowelement):
+                fluxvalue = slope*(wave[lwindowelement+k] - leftwindow) + leftflux
+                flux[lwindowelement+k] = fluxvalue
+                
+        elif i == 8:
+            
+            lwindowelement = int(windows[i][0])
+            rwindowelement = int(windows[i+1][1])
+            leftwindow = wave[windows[i][0]]
+            rightwindow = wave[windows[i+1][1]]
+            leftflux = flux[windows[i][0]]
+            rightflux = flux[windows[i+1][1]]
+        
+            slope = (rightflux - leftflux) / (rightwindow - leftwindow)
+
+            for k in range(rwindowelement - lwindowelement):
+                
+                fluxvalue = slope*(wave[lwindowelement+k] - leftwindow) + leftflux
+                flux[lwindowelement+k] = fluxvalue
+                
+    return flux
+
+def Brackett_Ratios_Updated(infile):
+
+    '''
+    Notes:
+        - Updated for use with pandas
+    '''
+
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import itertools
+
+    opened = pd.read_csv(infile)
+    '''    
+    for i in range(10):
+        y = opened.loc[i][5:]
+        print(y)
+        plate = int(opened.loc[i][2])
+        mjd = int(opened.loc[i][3])
+        fiber = int(opened.loc[i][4])
+        y = y/y[0]
+        x = np.arange(11,21)
+        plt.plot(x,y)
+        plt.scatter(x,y,s=30)
+        plt.grid(True,linestyle='dashed',linewidth=0.5)
+        plt.savefig('/Users/ballanr/Desktop/Pics/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.png')
+    '''
+    for index,row in itertools.islice(opened.iterrows(),1,50):
+        y = row[5:]
+        y = y/y[0]
+        plate = int(row[2])
+        mjd = int(row[3])
+        fiber = int(row[4])        
+        print(plate,mjd,fiber)
+        x = np.arange(11,21)
+        plt.plot(x,y)
+        plt.scatter(x,y,s=30)
+        plt.grid(True,linestyle='dashed',linewidth=0.5)
+        plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Ratios/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.png')
+        plt.clf()
+
+        if len(str(fiber)) == 1:
+            fiber = '00'+str(fiber)
+        if len(str(fiber)) == 2:
+            fiber = '0'+str(fiber)
+
+        filename = str(plate)+'-'+str(mjd)+'-'+str(fiber)
+        g = pd.read_csv('/Users/ballanr/Desktop/File Outputs/Wave and Flux/'+filename+'.csv',index_col=False)
+        x1 = g['Wavelength']
+        y1 = g['Flux']
+        plt.plot(x1,y1,linewidth=1)
+        plt.xlim(x1[10629],x1[11333])
+        plt.ylim(0.5*y1[10629],1.5*y1[10629])
+        plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Plots/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.png')
+        plt.clf()
