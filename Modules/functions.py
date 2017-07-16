@@ -1143,53 +1143,7 @@ def Skylines_Handler(plateid,MJD,fiber,filename):
             f.flush()
     f.close()
 
-def New_Br_EqW_Calc(filename):
 
-    '''
-    To Do:
-        - read in the fits file
-        - remove skylines
-        - save a temporary file with array going from min to max
-        - run new file through calculator
-        - if EqW measurement is > 0:
-            - save wavelength and flux arrays as a text file
-            - write the values to the catalog
-                - every ~10 values or so also plot the corrected spectrum with uncorrected and save it
-    '''
-
-    import functions
-    from tempfile import NamedTemporaryFile
-    import shutil
-    import csv
-
-    tempfile = NamedTemporaryFile(delete=False)
-
-    with open(filename,'r+') as csvfile,tempfile:
-        reader = csv.reader(csvfile,delimiter=',')
-        writer = csv.writer(tempfile,delimiter=',')
-        next(reader, None)
-
-        for row in reader:
-            plateid = row[2]
-            mjd = row[3]
-            if len(row[4]) == 3:
-                fiber = str(row[4])
-            elif len(row[4]) == 2:
-                fiber = '0' + str(row[4]) 
-            else:
-                fiber = '00' + str(row[4])
-            
-            fitsfile = functions.File_Path(plateid,mjd,fiber) #This file gets passed to astropy to open in skylines to modify
-            print(fitsfile)
-            #skylines = functions.Skylines_Handler(plateid,mjd,fiber,fitsfile) 
-            #Need to change this so that it saves a new file but doesn't update the existing copy
-    
-    
-    '''        
-            writer.writerow((row,othervalues))
-
-    shutil.move(tempfile.name,filename)
-    '''
 
 def apVisit_Updated_Catalog(infile,start):
 
@@ -1454,3 +1408,33 @@ def Brackett_Ratios_Updated(infile):
         plt.ylim(0.5*y1[10629],1.5*y1[10629])
         plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Plots/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.png')
         plt.clf()
+
+def Confidence_Level(file):
+
+    from astropy.io import fits
+    import numpy as np
+    import pandas as pd
+
+    gg = pd.read_csv(file)
+
+    for index,row in gg.iterrows():
+        
+        plate = int(row['Plate ID'])
+        mjd = int(row['MJD'])
+        fiber = int(row['Fiber'])
+
+        if len(str(fiber)) == 3:
+            fiber = str(row['Fiber'])
+        elif len(str(fiber)) == 2:
+            fiber = '0' + str(row['Fiber']) 
+        else:
+            fiber = '00' + str(fiber)
+
+        filepath = str(plate) + '/' + str(mjd) + '/apVisit-r6-' + str(plate) + '-' + str(mjd) + '-' + str(fiber)
+        fullpath = '/Volumes/CoveyData-1/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/' + filepath + '.fits'
+
+        openedfits = fits.open(fullpath)
+        hdu = openedfits[0]
+        SNR = hdu.header['SNR']
+        openedfits.close()
+        print(SNR)

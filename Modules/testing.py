@@ -18,7 +18,7 @@ import pandas as pd
 '''
 loc = '/Users/ballanr/Desktop/SummerResearch/T-Tauri/Modules/Visits.csv'
 loc1 = '/Users/ballanr/Desktop/SummerResearch/T-Tauri/Modules/11000 Visits.csv'
-g = functions.apVisit_Updated_Catalog(loc,100001)
+g = functions.apVisit_Updated_Catalog(loc,1)
 #g = functions.Brackett_Ratios_Updated('/Users/ballanr/Desktop/File Outputs/400001 - 500000 Equivs.csv')
-
+#g = functions.Confidence_Level('/Users/ballanr/Desktop/File Outputs/100001-200001 Equivs.csv')
 
