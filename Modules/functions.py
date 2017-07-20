@@ -1145,7 +1145,7 @@ def Skylines_Handler(plateid,MJD,fiber,filename):
 
 
 
-def apVisit_Updated_Catalog(infile,start):
+def apVisit_Updated_Catalog(infile):
 
     import functions
     import pandas as pd
@@ -1155,14 +1155,14 @@ def apVisit_Updated_Catalog(infile,start):
 
     x = pd.read_csv(infile,delimiter = '\t')
     problems = []
-    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','Br 11 EqW','Br 12 EqW',
+    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','Confidence1','Confidence2','Confidence 3','Br 11 EqW','Br 12 EqW',
        'Br 13 EqW','Br 14 EqW','Br 15 EqW','Br 16 EqW','Br 17 EqW','Br 18 EqW',
        'Br 19 EqW','Br 20 EqW']
     
     df = pd.DataFrame(columns = cols)
     g = 0
-    rowstart = start
-    rowend = start + 100000
+    rowstart = 0
+    rowend =  rowstart + 250000
     for index,row in itertools.islice(x.iterrows(),rowstart,rowend):
         try:
             g+=1
@@ -1183,6 +1183,7 @@ def apVisit_Updated_Catalog(infile,start):
             #this passes a filepath that astropy can open with fits, circumventing apogee entirely...
             
             openfile = fits.open(fitsfile)
+            snr = openfile[0].header['SNR']
             vbc = openfile[0].header['BC']
             c = 299792.458
             lamshift = 1 + (vbc/c)
@@ -1201,7 +1202,9 @@ def apVisit_Updated_Catalog(infile,start):
             for i in range(len(fwave.data[0])):
                 wave.append(fwave.data[0][-i-1])
                 flux.append(fspec.data[0][-i-1])
-                
+            
+            openfile.close()
+            
             newflux = functions.OH_Skylines_Remover(wave,flux)
             
             #now we run equiv width calc
@@ -1219,9 +1222,12 @@ def apVisit_Updated_Catalog(infile,start):
                 
             wave = np.asarray(wave) * lamshift #check which direction shift is going
             
-            if equiv_check > 1:
+            if equiv_check > 0:
                 
-                data = [int(loc),twomass,int(plateid),int(mjd),fiber,EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+                confidence1,confidence2 = functions.Confidence_Level(wave,flux,snr)
+                confidence3 = confidence1/confidence2
+
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,confidence1,confidence2,confidence3,EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
 
                 df.loc[len(df)+1] = data
 
@@ -1229,7 +1235,6 @@ def apVisit_Updated_Catalog(infile,start):
                 df1['Flux'] = newflux
                 filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
                 df1.to_csv('/Users/ballanr/Desktop/File Outputs/Wave and Flux/'+filename,index=False)
-            openfile.close()
 
         except KeyError:
             print('Row '+str(g)+' has no BC value...')
@@ -1241,8 +1246,9 @@ def apVisit_Updated_Catalog(infile,start):
             problems.append((loc,twomass,'FileNotFound'))
 
     probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Problem Type'])
-    probs.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'-'+str(rowend)+' Problems.csv')
-    df.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'-'+str(rowend)+' Equivs.csv',index=False)
+    probs.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'- End Problems.csv')
+    #df.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'- End Equivs.csv',index=False)
+    df.to_csv('/Users/ballanr/Desktop/testtest.csv',index=False)
 
 def Br_EqW(wave,spec,line,vbc):
     
@@ -1269,15 +1275,10 @@ def Br_EqW(wave,spec,line,vbc):
 
     if Fluxcontinuum != 0:
 
-        for i in range(L2,centerline):
+        for i in range(L2,R1):
 
-            left_area = (wave[i+1]-wave[i])*(spec[i+1]-Fluxcontinuum)-(1./2.)*(wave[i+1]-wave[i])*(spec[i+1]-spec[i])
-            EqW1 += left_area
-
-        for i in range(centerline,R1):
-
-            right_area = (wave[i+1]-wave[i])*(spec[i]-Fluxcontinuum)-(1./2.)*(wave[i+1]-wave[i])*(spec[i]-spec[i+1])
-            EqW1 += right_area
+            trapezoid = (0.5)*(wave[i+1] - wave[i])*(spec[i+1] + spec[i] - (2*Fluxcontinuum))
+            EqW1 += trapezoid
 
         #EqW_rounded = round(EqW1/Fluxcontinuum,5)
         EqW = EqW1/Fluxcontinuum
@@ -1366,22 +1367,9 @@ def Brackett_Ratios_Updated(infile):
     import itertools
 
     opened = pd.read_csv(infile)
-    '''    
-    for i in range(10):
-        y = opened.loc[i][5:]
-        print(y)
-        plate = int(opened.loc[i][2])
-        mjd = int(opened.loc[i][3])
-        fiber = int(opened.loc[i][4])
-        y = y/y[0]
-        x = np.arange(11,21)
-        plt.plot(x,y)
-        plt.scatter(x,y,s=30)
-        plt.grid(True,linestyle='dashed',linewidth=0.5)
-        plt.savefig('/Users/ballanr/Desktop/Pics/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.png')
-    '''
-    for index,row in itertools.islice(opened.iterrows(),1,50):
-        y = row[5:]
+
+    for index,row in itertools.islice(opened.iterrows(),0,31): #start is two behind what you want, end is one behind
+        y = row[8:]
         y = y/y[0]
         plate = int(row[2])
         mjd = int(row[3])
@@ -1391,7 +1379,7 @@ def Brackett_Ratios_Updated(infile):
         plt.plot(x,y)
         plt.scatter(x,y,s=30)
         plt.grid(True,linestyle='dashed',linewidth=0.5)
-        plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Ratios/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.png')
+        plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Ratios/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.pdf',dpi=300)
         plt.clf()
 
         if len(str(fiber)) == 1:
@@ -1406,35 +1394,39 @@ def Brackett_Ratios_Updated(infile):
         plt.plot(x1,y1,linewidth=1)
         plt.xlim(x1[10629],x1[11333])
         plt.ylim(0.5*y1[10629],1.5*y1[10629])
-        plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Plots/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.png')
+        plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Plots/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.pdf',dpi=300)
         plt.clf()
 
-def Confidence_Level(file):
+def Confidence_Level(wave,flux,snr):
 
-    from astropy.io import fits
     import numpy as np
-    import pandas as pd
+    import functions
 
-    gg = pd.read_csv(file)
-
-    for index,row in gg.iterrows():
+    center = functions.find_nearest(wave,16811.17934)
+    L1 = center - 240 # ~ 56 Angstroms
+    L2 = center - 151 # ~ 35 Angstroms
+    R1 = center + 150
+    R2 = center + 241
         
-        plate = int(row['Plate ID'])
-        mjd = int(row['MJD'])
-        fiber = int(row['Fiber'])
+    leftwindow = np.mean(flux[L1:L2])
+    rightwindow = np.mean(flux[R1:R2])
+    cmean = (0.5)*(leftwindow + rightwindow)
+    linemean = np.mean(flux[L2:R1])
+    lefterr = np.std(flux[L1:L2])
+    righterr = np.std(flux[R1:R2])
+    cerr = (0.5)*(lefterr + righterr)
+    confidence1 = (linemean - cmean)/cerr
+        
+    n_l = len(wave[L2:R1])
+    n_c = len(wave[L1:L2])+len(wave[R1:R2])
+    l = linemean
+    c = cmean
+    dellam = wave[L1+1]-wave[L1]
+    r = l/c
+    top = n_l*(dellam)**2
+    bottom = snr**2
+    sig = (top/bottom)*(r/n_c)*(r+n_c)
+    confidence2 = np.sqrt(sig)
+        
+    return confidence1,confidence2        
 
-        if len(str(fiber)) == 3:
-            fiber = str(row['Fiber'])
-        elif len(str(fiber)) == 2:
-            fiber = '0' + str(row['Fiber']) 
-        else:
-            fiber = '00' + str(fiber)
-
-        filepath = str(plate) + '/' + str(mjd) + '/apVisit-r6-' + str(plate) + '-' + str(mjd) + '-' + str(fiber)
-        fullpath = '/Volumes/CoveyData-1/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/' + filepath + '.fits'
-
-        openedfits = fits.open(fullpath)
-        hdu = openedfits[0]
-        SNR = hdu.header['SNR']
-        openedfits.close()
-        print(SNR)
