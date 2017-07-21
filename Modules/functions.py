@@ -1155,14 +1155,14 @@ def apVisit_Updated_Catalog(infile):
 
     x = pd.read_csv(infile,delimiter = '\t')
     problems = []
-    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','Confidence1','Confidence2','Confidence 3','Br 11 EqW','Br 12 EqW',
-       'Br 13 EqW','Br 14 EqW','Br 15 EqW','Br 16 EqW','Br 17 EqW','Br 18 EqW',
-       'Br 19 EqW','Br 20 EqW']
+    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','Confidence1','Confidence2','Confidence 3',
+            'Fractional','Br 11 EqW','Br 12 EqW','Br 13 EqW','Br 14 EqW','Br 15 EqW','Br 16 EqW','Br 17 EqW',
+            'Br 18 EqW','Br 19 EqW','Br 20 EqW']
     
     df = pd.DataFrame(columns = cols)
     g = 0
-    rowstart = 0
-    rowend =  rowstart + 250000
+    rowstart = 400000
+    rowend =  rowstart + 10000
     for index,row in itertools.islice(x.iterrows(),rowstart,rowend):
         try:
             g+=1
@@ -1224,10 +1224,11 @@ def apVisit_Updated_Catalog(infile):
             
             if equiv_check > 0:
                 
-                confidence1,confidence2 = functions.Confidence_Level(wave,flux,snr)
+                confidence1,confidence2,Mean = functions.Confidence_Level(wave,flux,snr)
                 confidence3 = confidence1/confidence2
 
-                data = [int(loc),twomass,int(plateid),int(mjd),fiber,confidence1,confidence2,confidence3,EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,confidence1,confidence2,confidence3,Mean,
+                        EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
 
                 df.loc[len(df)+1] = data
 
@@ -1369,7 +1370,7 @@ def Brackett_Ratios_Updated(infile):
     opened = pd.read_csv(infile)
 
     for index,row in itertools.islice(opened.iterrows(),0,31): #start is two behind what you want, end is one behind
-        y = row[8:]
+        y = row[9:]
         y = y/y[0]
         plate = int(row[2])
         mjd = int(row[3])
@@ -1392,6 +1393,7 @@ def Brackett_Ratios_Updated(infile):
         x1 = g['Wavelength']
         y1 = g['Flux']
         plt.plot(x1,y1,linewidth=1)
+        plt.scatter(x1,y1,s=25,color='black')
         plt.xlim(x1[10629],x1[11333])
         plt.ylim(0.5*y1[10629],1.5*y1[10629])
         plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Plots/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.pdf',dpi=300)
@@ -1407,7 +1409,8 @@ def Confidence_Level(wave,flux,snr):
     L2 = center - 151 # ~ 35 Angstroms
     R1 = center + 150
     R2 = center + 241
-        
+
+    #method 1 
     leftwindow = np.mean(flux[L1:L2])
     rightwindow = np.mean(flux[R1:R2])
     cmean = (0.5)*(leftwindow + rightwindow)
@@ -1417,6 +1420,7 @@ def Confidence_Level(wave,flux,snr):
     cerr = (0.5)*(lefterr + righterr)
     confidence1 = (linemean - cmean)/cerr
         
+    #method 2
     n_l = len(wave[L2:R1])
     n_c = len(wave[L1:L2])+len(wave[R1:R2])
     l = linemean
@@ -1428,5 +1432,8 @@ def Confidence_Level(wave,flux,snr):
     sig = (top/bottom)*(r/n_c)*(r+n_c)
     confidence2 = np.sqrt(sig)
         
-    return confidence1,confidence2        
+    #method 3
+    mean_ratio = linemean / cmean
+
+    return confidence1,confidence2,mean_ratio
 

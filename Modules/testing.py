@@ -17,8 +17,19 @@ import pandas as pd
 
 '''
 loc = '/Users/ballanr/Desktop/SummerResearch/T-Tauri/Modules/Visits.csv'
-loc1 = '/Users/ballanr/Desktop/SummerResearch/T-Tauri/Modules/11000 Visits.csv'
-g = functions.apVisit_Updated_Catalog(loc,1)
-#g = functions.Brackett_Ratios_Updated('/Users/ballanr/Desktop/File Outputs/400001 - 500000 Equivs.csv')
+loc1 = '/Users/ballanr/Desktop/testtest.csv'
+#g = functions.apVisit_Updated_Catalog(loc)
+g = functions.Brackett_Ratios_Updated(loc1)
 #g = functions.Confidence_Level('/Users/ballanr/Desktop/File Outputs/100001-200001 Equivs.csv')
 
+'''
+for i in range(6):
+    if i != 6:
+        rangestart = 100000*i
+        rangeend = rangestart + 100000
+        print(rangestart,rangeend)
+    else:
+        rangestart = 500000
+        rangeend = None
+        print(rangestart,rangeend)
+'''
