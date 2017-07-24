@@ -1156,13 +1156,13 @@ def apVisit_Updated_Catalog(infile):
     x = pd.read_csv(infile,delimiter = '\t')
     problems = []
     cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','Confidence1','Confidence2','Confidence 3',
-            'Fractional','Br 11 EqW','Br 12 EqW','Br 13 EqW','Br 14 EqW','Br 15 EqW','Br 16 EqW','Br 17 EqW',
-            'Br 18 EqW','Br 19 EqW','Br 20 EqW']
+            'Fractional','Area Ratios','Br 11 EqW']#,'Br 12 EqW','Br 13 EqW','Br 14 EqW','Br 15 EqW','Br 16 EqW','Br 17 EqW',
+            #'Br 18 EqW','Br 19 EqW','Br 20 EqW']
     
     df = pd.DataFrame(columns = cols)
     g = 0
-    rowstart = 400000
-    rowend =  rowstart + 10000
+    rowstart = 10000
+    rowend =  rowstart + 100000
     for index,row in itertools.islice(x.iterrows(),rowstart,rowend):
         try:
             g+=1
@@ -1212,6 +1212,11 @@ def apVisit_Updated_Catalog(infile):
             EqW = []
             equiv_check = 1000
             
+            #just for line 11
+            equiv_width,fcontinuum,shift,rest_wavelength = functions.Br_EqW(wave,newflux,11,vbc)
+            equiv_check = equiv_width
+            #for all the lines
+            '''
             for i in range(10):
                 
                 equiv_width,fcontinuum,shift,rest_wavelength = functions.Br_EqW(wave,newflux,lines[i],vbc)
@@ -1219,16 +1224,17 @@ def apVisit_Updated_Catalog(infile):
                 
                 if i == 0:
                     equiv_check = equiv_width
+            '''
                 
             wave = np.asarray(wave) * lamshift #check which direction shift is going
             
             if equiv_check > 0:
                 
-                confidence1,confidence2,Mean = functions.Confidence_Level(wave,flux,snr)
+                confidence1,confidence2,Mean,arearatios = functions.Confidence_Level(wave,flux,snr)
                 confidence3 = confidence1/confidence2
 
                 data = [int(loc),twomass,int(plateid),int(mjd),fiber,confidence1,confidence2,confidence3,Mean,
-                        EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+                        arearatios,equiv_width]#EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
 
                 df.loc[len(df)+1] = data
 
@@ -1246,10 +1252,10 @@ def apVisit_Updated_Catalog(infile):
             print('Row '+str(g)+' doesn\'t exist...')
             problems.append((loc,twomass,'FileNotFound'))
 
-    probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Problem Type'])
-    probs.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'- End Problems.csv')
+    #probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Problem Type'])
+    #probs.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'- End Problems.csv')
     #df.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'- End Equivs.csv',index=False)
-    df.to_csv('/Users/ballanr/Desktop/testtest.csv',index=False)
+    df.to_csv('/Users/ballanr/Desktop/testtest4.csv',index=False)
 
 def Br_EqW(wave,spec,line,vbc):
     
@@ -1261,10 +1267,10 @@ def Br_EqW(wave,spec,line,vbc):
     
     centerline = functions.find_nearest(wave,observed_wavelength)
     
-    L1 = centerline - 240 # ~ 56 Angstroms
-    L2 = centerline - 151 # ~ 35 Angstroms
+    L1 = centerline - 301 # ~ 27.42 Angstroms
+    L2 = centerline - 150 # ~ 17.21 Angstroms
     R1 = centerline + 150
-    R2 = centerline + 241
+    R2 = centerline + 301
 
     Fluxcontinuum = (np.sum(spec[L1:L2])+np.sum(spec[R1:R2])) / (len(spec[L1:L2])+len(spec[R1:R2]))
     EqW1 = 0
@@ -1369,19 +1375,23 @@ def Brackett_Ratios_Updated(infile):
 
     opened = pd.read_csv(infile)
 
-    for index,row in itertools.islice(opened.iterrows(),0,31): #start is two behind what you want, end is one behind
-        y = row[9:]
+    for index,row in itertools.islice(opened.iterrows(),0,100): #start is two behind what you want, end is one behind
+        '''
+        y = row[10:]
         y = y/y[0]
+        '''
         plate = int(row[2])
         mjd = int(row[3])
         fiber = int(row[4])        
         print(plate,mjd,fiber)
+        '''
         x = np.arange(11,21)
         plt.plot(x,y)
         plt.scatter(x,y,s=30)
         plt.grid(True,linestyle='dashed',linewidth=0.5)
         plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Ratios/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.pdf',dpi=300)
         plt.clf()
+        '''
 
         if len(str(fiber)) == 1:
             fiber = '00'+str(fiber)
@@ -1393,7 +1403,7 @@ def Brackett_Ratios_Updated(infile):
         x1 = g['Wavelength']
         y1 = g['Flux']
         plt.plot(x1,y1,linewidth=1)
-        plt.scatter(x1,y1,s=25,color='black')
+        plt.scatter(x1,y1,s=10,color='black')
         plt.xlim(x1[10629],x1[11333])
         plt.ylim(0.5*y1[10629],1.5*y1[10629])
         plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Plots/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.pdf',dpi=300)
@@ -1405,10 +1415,10 @@ def Confidence_Level(wave,flux,snr):
     import functions
 
     center = functions.find_nearest(wave,16811.17934)
-    L1 = center - 240 # ~ 56 Angstroms
-    L2 = center - 151 # ~ 35 Angstroms
+    L1 = center - 301 # ~ 56 Angstroms
+    L2 = center - 150 # ~ 35 Angstroms
     R1 = center + 150
-    R2 = center + 241
+    R2 = center + 301
 
     #method 1 
     leftwindow = np.mean(flux[L1:L2])
@@ -1435,5 +1445,41 @@ def Confidence_Level(wave,flux,snr):
     #method 3
     mean_ratio = linemean / cmean
 
-    return confidence1,confidence2,mean_ratio
+    #method 4
+    abovex = []
+    abovey = []
+    belowx = []
+    belowy = []
+
+    for k in range(R1-L2):
+        x = wave[L2 + k]
+        y = flux[L2 + k]
+        gy = y - cmean
+        
+        if gy > 0:
+            abovex.append(x)
+            abovey.append(y)
+        else:
+            belowx.append(x)
+            belowy.append(y)
+
+    aboveArea = 0
+    belowArea = 0
+
+    for i in range(len(abovex)-1):
+
+                trapezoid = (0.5)*(abovex[i+1] - abovex[i])*(abovey[i+1] + abovey[i] - (2*cmean))
+                aboveArea += trapezoid
+
+    for j in range(len(belowx)-1):
+
+                trapezoid1 = (0.5)*(belowx[j+1] - belowx[j])*(-belowy[j+1] - belowy[j] + (2*cmean))
+                belowArea += trapezoid1
+
+    if belowArea != 0:
+        funratio = (aboveArea / belowArea)
+    else: 
+        funratio = aboveArea
+          
+    return confidence1,confidence2,mean_ratio,funratio
 
