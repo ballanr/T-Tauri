@@ -1375,7 +1375,7 @@ def Brackett_Ratios_Updated(infile):
 
     opened = pd.read_csv(infile)
 
-    for index,row in itertools.islice(opened.iterrows(),0,100): #start is two behind what you want, end is one behind
+    for index,row in itertools.islice(opened.iterrows(),0,None): #start is two behind what you want, end is one behind
         '''
         y = row[10:]
         y = y/y[0]
@@ -1405,7 +1405,7 @@ def Brackett_Ratios_Updated(infile):
         plt.plot(x1,y1,linewidth=1)
         plt.scatter(x1,y1,s=10,color='black')
         plt.xlim(x1[10629],x1[11333])
-        plt.ylim(0.5*y1[10629],1.5*y1[10629])
+        plt.ylim(0.5*y1[10629],1.5*y1[10981])
         plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Plots/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.pdf',dpi=300)
         plt.clf()
 
