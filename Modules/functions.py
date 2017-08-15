@@ -309,7 +309,7 @@ def File_Path(plateid,mjd,fiber):
     Notes:
         - Need to rework this to include Location ID from master list
     '''
-    server = '/Volumes/CoveyData-1/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
+    server = '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
     #server = '/Users/ballanr/Desktop/SummerResearch/dr13/apogee/spectro/redux/r6/apo25m/'
     plate = str(plateid)
     MJD = str(mjd)
@@ -641,511 +641,9 @@ def Uniqueness_Filter(array, locid, twomassid):
     
     return state
 
-def Equivalent_Width_Error(plateid,MJD,fiber):
 
 
-    '''
-    Notes:
-
-        - Work on this later
-    
-    '''
-
-    import apogee.tools.read as apread
-
-    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
-    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
-
-    filename = functions.File_Path(plateid,MJD,fiber)
-    main_header = fits.open(filename)
-
-    vbc = main_header[0].header['BC']
-    vhelio = main_header[0].header['VHELIO']
-    observed_wavelength,shift,rest_wavelength = Barycentric_Correction(emission_line,vbc)
-
-    '''
-    W_lambda = equivalent width, milli-Angstroms
-    lambda1, lambda2 = limits of integration for line profile, Angstroms
-    l = line signal, flux units
-    c = continuum signal, flux units
-    del_lambda = linear dispersion/plate scale, milli-Angstroms per data point
-    r = residual intensity, l/c
-    n_l = number of points between lambda1 and lambda2
-    n_c = number of selected continuum points
-    SNR = signal-to-noise ratio
-    '''
-    centerline = find_nearest(wave,observed_wavelength) #Finds the closest element of wave for our observed peak
-
-    L1 = centerline - 240 # ~ 56 Angstroms
-    L2 = centerline - 150 # ~ 35 Angstroms
-    R1 = centerline + 150
-    R2 = centerline + 240
-
-    lambda1 = wave[L2]
-    lambda2 = wave[R1]
-    n_l = R1 - L2
-    del_lambda = (lambda2-lambda1) / n_l
-
-    l = spec[L2:R1]
-    leftc = np.sum(spec[L1:L2])
-    rightc = np.sum(spec[R1:R2])
-    c = (leftc + rightc) / ((L2 - L1) + (R2 - R1))
-    
-    summed = 0
-
-    for element in l:
-
-        summed += l[element] / c
-
-    W_lambda = (n_l * del_lambda) - del_lambda * sum(l/c)
-    sig_squared = n_l * ((del_lambda ** 2)/(SNR ** 2)) * (r/n_c) * (r + n_c)
-
-
-    '''
-    with open(filename) as csvfile:
-
-        reader = csv.reader(csvfile,delimiter='\t')
-        
-        for row in reader:
-
-            for a,b,c,d in row:
-
-                if a == '''
-
-def Skylines_Handler_Apogee(plateid,MJD,fiber,filename):
-    import functions
-    import apogee.tools.read as apread
-    import numpy as np
-    from astropy.io import fits
-    '''
-    Notes:
-    '''
-
-    OH_Lines = [16840.481,16802.368,16414.737,16388.492,16128.608,16079.753,15897.211,
-                15890.033,15869.307,15862.489,15702.539,15597.631,15570.159,15546.141,
-                15540.945,15539.711,15474.212,15462.125,15432.156,15430.163,15332.402,
-                15287.789,15240.954,15187.140]
-
-    averages = []
-    windows = []
-
-    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
-    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
-
-
-    #Linear Interpolation-----------------------------------------------------------------------------------------------|
-
-    for i in range(len(OH_Lines)):
-
-        x1 = functions.find_nearest(wave,OH_Lines[i]-1.5)
-        x2 = functions.find_nearest(wave,OH_Lines[i]+1.5)
-        
-        windows.append((x1,x2))
-    
-    
-    f = fits.open(filename,mode='update')
-
-    fspec = f[1]
-    
-    for i in range(len(windows)):
-        
-        if i != 14 and i != 18 and i != 15 and i != 19:
-
-            if windows[i][0] > 8192:
-                x = int(windows[i][0]) - 8192
-                y = int(windows[i][1]) - 8192
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i][0])
-                xleft = wave[windows[i][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            elif windows[i][0] < 8192 and windows[i][0] > 4096:
-                x = int(windows[i][0]) - 4096
-                y = int(windows[i][1]) - 4096
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i][0])
-                xleft = wave[windows[i][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            else:
-                x = int(windows[i][0])
-                y = int(windows[i][1])
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i][0])
-                xleft = wave[windows[i][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            print(slope)
-            f.flush()
-        
-        elif i == 14:
-            
-            #set left bound to be 15s left bound and the right bound to 16s then proceed with calculation
-            if windows[i][0] > 8192:
-                x = int(windows[i+1][0]) - 8192
-                y = int(windows[i][1]) - 8192
-                xx = 4096 - x
-                yy = 4096 - y
-    
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft) 
-    
-                for k in range(xx-yy):
-
-                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft 
-
-            elif windows[i][0] < 8192 and windows[i][0] > 4096:
-                x = int(windows[i+1][0]) - 4096
-                y = int(windows[i][1]) - 4096
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-            
-            else:
-                x = int(windows[i+1][0])
-                y = int(windows[i][1])
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            print(slope)
-            f.flush()
-        elif i == 18:
-            
-            #set left bound to be 15s left bound and the right bound to 16s then proceed with calculation
-            if windows[i][0] > 8192:
-                x = int(windows[i+1][0]) - 8192
-                y = int(windows[i][1]) - 8192
-                xx = 4096 - x
-                yy = 4096 - y
-    
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft) 
-    
-                for k in range(xx-yy):
-
-                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft 
-
-            elif windows[i][0] < 8192 and windows[i][0] > 4096:
-                x = int(windows[i+1][0]) - 4096
-                y = int(windows[i][1]) - 4096
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-            
-            else:
-                x = int(windows[i+1][0])
-                y = int(windows[i][1])
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            print(slope)
-            f.flush()
-    f.close()
-
-def Skylines_Handler(plateid,MJD,fiber,filename):
-    import functions
-    import apogee.tools.read as apread
-    import numpy as np
-    from astropy.io import fits
-    '''
-    Notes: 
-        - Need to change this to work with new output files (the ascending order versions)
-        - indexes need to be reversed since the arrays are left to right 
-        - can delete this 
-    '''
-
-    OH_Lines = [16840.481,16802.368,16414.737,16388.492,16128.608,16079.753,15897.211,
-                15890.033,15869.307,15862.489,15702.539,15597.631,15570.159,15546.141,
-                15540.945,15539.711,15474.212,15462.125,15432.156,15430.163,15332.402,
-                15287.789,15240.954,15187.140]
-
-    averages = []
-    windows = []
-
-    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
-    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
-
-
-    #Linear Interpolation-----------------------------------------------------------------------------------------------|
-
-    for i in range(len(OH_Lines)):
-
-        x1 = functions.find_nearest(wave,OH_Lines[i]-1.5)
-        x2 = functions.find_nearest(wave,OH_Lines[i]+1.5)
-        
-        windows.append((x1,x2))
-    
-    
-    f = fits.open(filename,mode='update')
-
-    fspec = f[1]
-    
-    for i in range(len(windows)):
-        
-        if i != 14 and i != 18 and i != 15 and i != 19:
-
-            if windows[i][0] > 8192:
-                x = int(windows[i][0]) - 8192
-                y = int(windows[i][1]) - 8192
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i][0])
-                xleft = wave[windows[i][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            elif windows[i][0] < 8192 and windows[i][0] > 4096:
-                x = int(windows[i][0]) - 4096
-                y = int(windows[i][1]) - 4096
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i][0])
-                xleft = wave[windows[i][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            else:
-                x = int(windows[i][0])
-                y = int(windows[i][1])
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i][0])
-                xleft = wave[windows[i][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            print(slope)
-            f.flush()
-        
-        elif i == 14:
-            
-            #set left bound to be 15s left bound and the right bound to 16s then proceed with calculation
-            if windows[i][0] > 8192:
-                x = int(windows[i+1][0]) - 8192
-                y = int(windows[i][1]) - 8192
-                xx = 4096 - x
-                yy = 4096 - y
-    
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft) 
-    
-                for k in range(xx-yy):
-
-                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft 
-
-            elif windows[i][0] < 8192 and windows[i][0] > 4096:
-                x = int(windows[i+1][0]) - 4096
-                y = int(windows[i][1]) - 4096
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-            
-            else:
-                x = int(windows[i+1][0])
-                y = int(windows[i][1])
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            print(slope)
-            f.flush()
-        elif i == 18:
-            
-            #set left bound to be 15s left bound and the right bound to 16s then proceed with calculation
-            if windows[i][0] > 8192:
-                x = int(windows[i+1][0]) - 8192
-                y = int(windows[i][1]) - 8192
-                xx = 4096 - x
-                yy = 4096 - y
-    
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft) 
-    
-                for k in range(xx-yy):
-
-                    fspec.data[0][xx-k] = slope*(wave[x3+k]-xleft) + yleft 
-
-            elif windows[i][0] < 8192 and windows[i][0] > 4096:
-                x = int(windows[i+1][0]) - 4096
-                y = int(windows[i][1]) - 4096
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[1][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-            
-            else:
-                x = int(windows[i+1][0])
-                y = int(windows[i][1])
-                xx = 4096 - x
-                yy = 4096 - y
-
-                x3 = int(windows[i+1][0])
-                xleft = wave[windows[i+1][0]]
-                xright = wave[windows[i][1]]
-                yleft = spec[windows[i+1][0]]
-                yright = spec[windows[i][1]]
-                slope = (yright - yleft) / (xright - xleft)
-
-
-                for k in range(xx-yy):
-
-                    fspec.data[2][xx-k] = slope*(wave[x3+k]-xleft) + yleft
-
-            print(slope)
-            f.flush()
-    f.close()
-
-
-
-def apVisit_Updated_Catalog(infile):
+def apVisit_Updated_Catalog(infile,rowstart):
 
     import functions
     import pandas as pd
@@ -1155,14 +653,13 @@ def apVisit_Updated_Catalog(infile):
 
     x = pd.read_csv(infile,delimiter = '\t')
     problems = []
-    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','Confidence1','Confidence2','Confidence 3',
-            'Fractional','Area Ratios','Br 11 EqW']#,'Br 12 EqW','Br 13 EqW','Br 14 EqW','Br 15 EqW','Br 16 EqW','Br 17 EqW',
+    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','confidence1','confidence2','Mean','arearatios','SNR','Br 11 EqW']#,'Br 12 EqW','Br 13 EqW','Br 14 EqW','Br 15 EqW','Br 16 EqW','Br 17 EqW',
             #'Br 18 EqW','Br 19 EqW','Br 20 EqW']
     
     df = pd.DataFrame(columns = cols)
     g = 0
-    rowstart = 10000
-    rowend =  rowstart + 100000
+    #rowstart = 10000
+    rowend =  rowstart + 79468
     for index,row in itertools.islice(x.iterrows(),rowstart,rowend):
         try:
             g+=1
@@ -1231,10 +728,9 @@ def apVisit_Updated_Catalog(infile):
             if equiv_check > 0:
                 
                 confidence1,confidence2,Mean,arearatios = functions.Confidence_Level(wave,flux,snr)
-                confidence3 = confidence1/confidence2
+                #confidence3 = confidence1/confidence2
 
-                data = [int(loc),twomass,int(plateid),int(mjd),fiber,confidence1,confidence2,confidence3,Mean,
-                        arearatios,equiv_width]#EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,confidence1,confidence2,Mean,arearatios,snr,equiv_width]#EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
 
                 df.loc[len(df)+1] = data
 
@@ -1242,6 +738,7 @@ def apVisit_Updated_Catalog(infile):
                 df1['Flux'] = newflux
                 filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
                 df1.to_csv('/Users/ballanr/Desktop/File Outputs/Wave and Flux/'+filename,index=False)
+                df1 = df1.iloc[0:0]
 
         except KeyError:
             print('Row '+str(g)+' has no BC value...')
@@ -1252,20 +749,21 @@ def apVisit_Updated_Catalog(infile):
             print('Row '+str(g)+' doesn\'t exist...')
             problems.append((loc,twomass,'FileNotFound'))
 
-    #probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Problem Type'])
-    #probs.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'- End Problems.csv')
-    #df.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'- End Equivs.csv',index=False)
-    df.to_csv('/Users/ballanr/Desktop/testtest4.csv',index=False)
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'-'+str(rowend)+' End.csv',index=False)
+    df = df.iloc[0:0]
+
+    probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Problem Type'])
+    probs.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'-'+str(rowend)+' Problems.csv',index=False)
 
 def Br_EqW(wave,spec,line,vbc):
     
     import functions
     import numpy as np
     
-    wave = np.asarray(wave)
+    #wave = np.asarray(wave)
     observed_wavelength,shift,rest_wavelength = functions.Barycentric_Correction(line,vbc)
-    
-    centerline = functions.find_nearest(wave,observed_wavelength)
+    rest = rest_wavelength*(10**10)
+    centerline = functions.find_nearest(wave,rest)
     
     L1 = centerline - 301 # ~ 27.42 Angstroms
     L2 = centerline - 150 # ~ 17.21 Angstroms
@@ -1279,142 +777,27 @@ def Br_EqW(wave,spec,line,vbc):
 
         EqW1 = 0
         EqW1_rounded = 0
-
+        equivs = 0
+        
     if Fluxcontinuum != 0:
 
         for i in range(L2,R1):
 
             trapezoid = (0.5)*(wave[i+1] - wave[i])*(spec[i+1] + spec[i] - (2*Fluxcontinuum))
             EqW1 += trapezoid
-
-        #EqW_rounded = round(EqW1/Fluxcontinuum,5)
-        EqW = EqW1/Fluxcontinuum
+        
+    #EqW_rounded = round(EqW1/Fluxcontinuum,5)
+        equivs = EqW1/Fluxcontinuum
     
-    return EqW,Fluxcontinuum,shift,rest_wavelength
+    return equivs,Fluxcontinuum,shift,rest_wavelength
 
-def OH_Skylines_Remover(wave,flux):
-    
-    import functions
-    import numpy as np
-    
-    OH_Lines = [15187.14,15240.954,15287.789,15332.402,15430.163,15432.156,15462.125,15474.212,
-                15539.711,15540.945,15546.141,15570.159,15597.631,15702.539,15862.489,15869.307,
-                15890.033,15897.211,16079.753,16128.608,16388.492,16414.737,16802.368,16840.481]
-    
-    windows = []
-    wave = np.asarray(wave)
-    
-    for i in range(len(OH_Lines)):
-        
-        lwindow = functions.find_nearest(wave,OH_Lines[i]-1.5)
-        rwindow = functions.find_nearest(wave,OH_Lines[i]+1.5)
-        
-        windows.append((lwindow,rwindow))
-    
-    for i in range(len(windows)):
-        
-        if i != 4 and i != 5 and i != 8 and i != 9:
-            
-            lwindowelement = int(windows[i][0])
-            rwindowelement = int(windows[i][1])
-            leftwindow = wave[windows[i][0]]
-            rightwindow = wave[windows[i][1]]
-            leftflux = flux[windows[i][0]]
-            rightflux = flux[windows[i][1]]
-        
-            slope = (rightflux - leftflux) / (rightwindow - leftwindow)
-        
-            for k in range(rwindowelement - lwindowelement):
-                fluxvalue = slope*(wave[lwindowelement+k] - leftwindow) + leftflux
-                flux[lwindowelement+k] = fluxvalue
-        
-        elif i == 4:
-            
-            lwindowelement = int(windows[i][0])
-            rwindowelement = int(windows[i+1][1])
-            leftwindow = wave[windows[i][0]]
-            rightwindow = wave[windows[i+1][1]]
-            leftflux = flux[windows[i][0]]
-            rightflux = flux[windows[i+1][1]]
-        
-            slope = (rightflux - leftflux) / (rightwindow - leftwindow)
-        
-            for k in range(rwindowelement - lwindowelement):
-                fluxvalue = slope*(wave[lwindowelement+k] - leftwindow) + leftflux
-                flux[lwindowelement+k] = fluxvalue
-                
-        elif i == 8:
-            
-            lwindowelement = int(windows[i][0])
-            rwindowelement = int(windows[i+1][1])
-            leftwindow = wave[windows[i][0]]
-            rightwindow = wave[windows[i+1][1]]
-            leftflux = flux[windows[i][0]]
-            rightflux = flux[windows[i+1][1]]
-        
-            slope = (rightflux - leftflux) / (rightwindow - leftwindow)
 
-            for k in range(rwindowelement - lwindowelement):
-                
-                fluxvalue = slope*(wave[lwindowelement+k] - leftwindow) + leftflux
-                flux[lwindowelement+k] = fluxvalue
-                
-    return flux
-
-def Brackett_Ratios_Updated(infile):
-
-    '''
-    Notes:
-        - Updated for use with pandas
-    '''
-
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import itertools
-
-    opened = pd.read_csv(infile)
-
-    for index,row in itertools.islice(opened.iterrows(),0,None): #start is two behind what you want, end is one behind
-        '''
-        y = row[10:]
-        y = y/y[0]
-        '''
-        plate = int(row[2])
-        mjd = int(row[3])
-        fiber = int(row[4])        
-        print(plate,mjd,fiber)
-        '''
-        x = np.arange(11,21)
-        plt.plot(x,y)
-        plt.scatter(x,y,s=30)
-        plt.grid(True,linestyle='dashed',linewidth=0.5)
-        plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Ratios/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.pdf',dpi=300)
-        plt.clf()
-        '''
-
-        if len(str(fiber)) == 1:
-            fiber = '00'+str(fiber)
-        if len(str(fiber)) == 2:
-            fiber = '0'+str(fiber)
-
-        filename = str(plate)+'-'+str(mjd)+'-'+str(fiber)
-        g = pd.read_csv('/Users/ballanr/Desktop/File Outputs/Wave and Flux/'+filename+'.csv',index_col=False)
-        x1 = g['Wavelength']
-        y1 = g['Flux']
-        plt.plot(x1,y1,linewidth=1)
-        plt.scatter(x1,y1,s=10,color='black')
-        plt.xlim(x1[10629],x1[11333])
-        plt.ylim(0.5*y1[10629],1.5*y1[10981])
-        plt.savefig('/Users/ballanr/Desktop/File Outputs/Br11 Plots/Plots/'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.pdf',dpi=300)
-        plt.clf()
-
-def Confidence_Level(wave,flux,snr):
+def Confidence_Level(wave,flux,snr,restwave):
 
     import numpy as np
     import functions
 
-    center = functions.find_nearest(wave,16811.17934)
+    center = functions.find_nearest(wave,restwave)
     L1 = center - 301 # ~ 56 Angstroms
     L2 = center - 150 # ~ 35 Angstroms
     R1 = center + 150
@@ -1429,7 +812,7 @@ def Confidence_Level(wave,flux,snr):
     righterr = np.std(flux[R1:R2])
     cerr = (0.5)*(lefterr + righterr)
     confidence1 = (linemean - cmean)/cerr
-        
+    
     #method 2
     n_l = len(wave[L2:R1])
     n_c = len(wave[L1:L2])+len(wave[R1:R2])
@@ -1440,11 +823,8 @@ def Confidence_Level(wave,flux,snr):
     top = n_l*(dellam)**2
     bottom = snr**2
     sig = (top/bottom)*(r/n_c)*(r+n_c)
-    confidence2 = np.sqrt(sig)
-        
-    #method 3
-    mean_ratio = linemean / cmean
-
+    ebbets = np.sqrt(sig)
+    
     #method 4
     abovex = []
     abovey = []
@@ -1481,5 +861,345 @@ def Confidence_Level(wave,flux,snr):
     else: 
         funratio = aboveArea
           
-    return confidence1,confidence2,mean_ratio,funratio
+    return confidence1,ebbets,funratio
 
+def skylines_cleaner(wave,flux):
+    
+    import functions
+    import numpy as np
+
+    windows = []
+    wave = np.asarray(wave)
+
+    removal_beginning = [15185.0,15240.0,15286.0,15330.0,15393.6,15429.9,15460.8,15473.3,15499.6,15508.0,15516.0,
+                        15538.5,15545.0,15568.9,15595.9,15652.9,15701.3,15758.9,15861.5,15867.1,15874.3,15888.8,
+                        15971.1,16028.8,16078.2,16126.4,16193.1,16233.4,16269.5,16278.8,16301.1,16314.8,16339.1,
+                        16349.3,16356.3,16358.6,16387.1,16413.5,16475.1,16476.9,16478.3,16501.4,16527.4,16530.4,
+                        16542.7,16552.9,16558.7,16585.4,16609.4,16611.6,16654.1,16658.2,16666.4,16688.2,16691.2,
+                        16701.7,16707.7,16711.8,16717.7,16723.1,16725.1,16730.9,16753.4,16755.9,16761.5,16764.8,
+                        16839.5,16852.8,16877.2,16883.0,16888.8,16890.3,16899.6,16902.4,16907.1,16908.6,16909.9,16913.7]
+
+    removal_ending = [15189.0,15242.6,15289.0,15334.7,15396.6,15433.9,15463.8,15475.3,15502.3,15511.0,
+                    15518.8,15543.4,15547.6,15571.4,15599.3,15658.9,15704.3,15761.8,15863.6,15871.0,
+                    15877.0,15892.7,15974.4,16033.1,16081.6,16131.0,16196.5,16237.9,16271.4,16280.7,
+                    16304.7,16318.7,16343.0,16353.7,16357.2,16361.7,16390.3,16416.2,16476.3,16477.9,
+                    16479.7,16503.7,16528.9,16531.1,16543.5,16555.1,16560.2,16587.5,16610.7,16612.8,
+                    16655.0,16661.0,16667.3,16690.4,16693.9,16703.8,16710.5,16712.5,16719.7,16724.5,
+                    16725.9,16734.9,16755.2,16756.8,16762.5,16765.9,16841.6,16853.3,16877.8,16884.5,
+                    16889.5,16891.2,16900.2,16905.5,16907.7,16909.3,16910.6,16914.3]
+
+    for i in range(len(removal_beginning)):
+
+        lwindow = functions.find_nearest(wave,removal_beginning[i])
+        rwindow = functions.find_nearest(wave,removal_ending[i])
+
+        windows.append((lwindow,rwindow))
+
+    for i in range(len(removal_beginning)):
+
+        lwindowelement = int(windows[i][0])
+        rwindowelement = int(windows[i][1])
+        leftwindow = wave[windows[i][0]]
+        rightwindow = wave[windows[i][1]]
+        leftflux = flux[windows[i][0]]
+        rightflux = flux[windows[i][1]]
+
+        slope = (rightflux - leftflux) / (rightwindow - leftwindow)
+
+        for k in range(rwindowelement - lwindowelement):
+
+            fluxvalue = slope*(wave[lwindowelement+k] - leftwindow) + leftflux
+            flux[lwindowelement+k] = fluxvalue
+
+    return flux
+
+
+def DR15_Brackett_Catalog():
+
+    import functions
+    import pandas as pd
+    from astropy.io import fits as fits
+    import numpy as np
+    import itertools
+    from PyAstronomy.pyasl import helcorr as helcorr
+
+    dr15table = pd.read_csv('/Users/ballanr/Desktop/File Outputs/forMdot_analysis.csv')
+    problems = []
+    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','S/R','Overall Confidence','Br11 Error',
+            'Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error',
+            'Br19 Error','Br20 Error','Br11 EqW','Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW',
+            'Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW']
+
+    rowstart = 1000
+
+    df = pd.DataFrame(columns = cols)
+    g = 0
+
+    for index,row in itertools.islice(dr15table.iterrows(),rowstart,None):
+        try:
+            g+=1
+            loc = row['LOCID']
+            twomass = row['2MASS_ID']
+            print(str(g))
+            plateid = row['PLATE']
+            mjd = row['MJD']
+            snr = row['S/N']
+            if len(str(row['FIB'])) == 3:
+                fiber = str(row['FIB'])
+            elif len(str(row['FIB'])) == 2:
+                fiber = '0' + str(row['FIB']) 
+            else:
+                fiber = '00' + str(row['FIB'])
+
+            fitsfile = row['path-to-file-on-CoveyData']
+
+            #this passes a filepath that astropy can open with fits, circumventing apogee entirely...
+            
+            openfile = fits.open(fitsfile)
+
+            header = openfile[0].header
+
+            ra = header['RA']
+            dec = header['DEC'] 
+            jd = header['JD-MID']
+            telescope = header['TELESCOP']
+            
+            if telescope == 'apo25m':
+                height = 2788
+                longg = -105.4913
+                lat = 36.4649
+            else:
+                height = 2380
+                longg = -70.413336
+                lat = -29.05256
+
+            vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+
+            c = 299792.458
+            lamshift = 1 + (vbc/c)
+            
+            fspec = openfile[1]
+            ferr = openfile[2]
+            fwave = openfile[4]
+            wave = []
+            flux = []
+            error = []
+            
+            for i in range(len(fwave.data[2])):
+                wave.append(fwave.data[2][-i-1])
+                flux.append(fspec.data[2][-i-1])
+                error.append(ferr.data[2][-i-1])
+            for j in range(len(fwave.data[1])):
+                wave.append(fwave.data[1][-j-1])
+                flux.append(fspec.data[1][-j-1])
+                error.append(ferr.data[2][-j-1])
+            for k in range(len(fwave.data[0])):
+                wave.append(fwave.data[0][-k-1])
+                flux.append(fspec.data[0][-k-1])
+                error.append(ferr.data[2][-k-1])
+            
+            openfile.close()
+            
+            newflux = functions.skylines_cleaner(wave,flux)
+            
+            #now we run equiv width calc
+            lines = [11,12,13,14,15,16,17,18,19,20]
+            EqW = []
+            restwaves = []
+            econfidences = []
+            confidences = []
+            equivs_error = []
+            equiv_check = 1000
+            
+            wave = np.asarray(wave) * lamshift #check which direction shift is going
+
+            for i in range(10):
+                
+                equiv_width,fcontinuum,shift,rest_wavelength = functions.Br_EqW(wave,newflux,lines[i],vbc)
+                rest = rest_wavelength*(10**10)
+                EqW.append(equiv_width)
+                restwaves.append(rest)
+                
+                dEqW = functions.Br_Error(wave,newflux,error,lines[i])
+                equivs_error.append(dEqW)
+                
+                if i == 0:
+                    equiv_check = equiv_width
+            
+            if equiv_check > 0:
+                
+                for k in range(len(restwaves)):
+
+                    Confidence,ebbet,arearatios = functions.Confidence_Level(wave,flux,snr,restwaves[k])
+                    #econfidences.append(ebbet)
+                    confidences.append(Confidence)
+
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,confidences[0],equivs_error[0],equivs_error[1],
+                        equivs_error[2],equivs_error[3],equivs_error[4],equivs_error[5],equivs_error[6],equivs_error[7],
+                        equivs_error[8],equivs_error[9],EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+
+                df.loc[len(df)+1] = data
+
+                df1 = pd.DataFrame(wave,columns=['Wavelength'])
+                df1['Flux'] = newflux
+                df1['Error'] = error
+                filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+                df1.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'+filename,index=False)
+                df1 = df1.iloc[0:0]                        
+
+        except KeyError:
+            print('Row '+str(g)+' has no BC value...')
+            problems.append((loc,twomass,plateid,mjd,fiber,'KeyError'))
+            openfile.close()
+        
+        except FileNotFoundError:
+            print('Row '+str(g)+' doesn\'t exist...')
+            problems.append((loc,twomass,plateid,mjd,fiber,'FileNotFound'))
+
+
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Catalog-test.csv',index=False)
+    df = df.iloc[0:0]
+
+    probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
+    probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Catalog Problems-test.csv',index=False)
+
+def Br_Error(wave,flux,err,line):
+    
+    import functions
+    import numpy as np
+
+    emission,nah,nahh = functions.Barycentric_Correction(line,0)
+    center = functions.find_nearest(wave,emission)
+    
+    wave1 = np.asarray(wave[center-301:center+301])
+    flux1 = np.asarray(flux[center-301:center+301])
+    err1 = np.asarray(err[center-301:center+301])
+    
+    L1 = 0
+    L2 = 151
+    R1 = 451
+    R2 = 602
+    
+    lcheck = np.median(err1[L1:L2])
+    for k in range(L1,L2):
+        if err1[k] > 10*lcheck:
+            err1[k] = 10*lcheck
+
+
+    rcheck = np.median(err1[R1:R2])
+    for k in range(R1,R2):
+        if err1[k] > 10*rcheck:
+            err1[k] = 10*rcheck
+
+
+    
+    Fc = (np.sum(flux1[L1:L2]) + np.sum(flux1[R1:R2])) / (len(flux1[L1:L2]) + len(flux1[R1:R2]))
+    dFc = (np.sum(err1[L1:L2]) + np.sum(err1[R1:R2])) / (len(err1[L1:L2]) + len(err1[R1:R2]))
+    
+
+    fluxavg = 0 
+    
+    for i in range(L2,R1):
+
+        fluxavg += flux1[i] - Fc
+        
+        #A += (0.5)*(wave1[i+1] - wave1[i])*(flux1[i+1] + flux1[i] - (2*Fc))
+    
+    N = len(wave1[L2:R1])
+    fluxavg = fluxavg / N
+    del_lam = wave1[2] - wave1[1]    
+    A = N*del_lam*fluxavg
+
+    dA = 0
+    for k in range(L2,R1):
+
+        #dA += (0.5)*(wave1[k+1] - wave1[k])*(err1[k+1] + err1[k] + (2*dFc))
+
+        dA += err[k]**2
+
+    dA = del_lam * np.sqrt(dA)
+
+    dEqW = (1/(Fc**2)) * np.sqrt( (Fc*dA)**2 + (A*dFc)**2 )
+    #EqW = A / Fc
+
+    return dEqW
+
+def Brackett_Ratios_Updated(plate,mjd,fiber):
+
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import itertools
+    
+    #finding the equivalent widths and errors for a given visit
+    filefile = pd.read_csv('/Users/ballanr/Desktop/File Outputs/DR15/Catalog-test.csv')
+
+    if len(str(fiber)) == 3:
+        Fiber = str(fiber)
+    elif len(str(fiber)) == 2:
+        Fiber = '0' + str(fiber) 
+    else:
+        Fiber = '00' + str(fiber)
+    equivs = []
+    errors = []
+    for index,row in itertools.islice(filefile.iterrows(),0,None):
+        plateid = int(row['Plate ID'])
+        MJD = int(row['MJD'])
+        ffiber = str(row['Fiber'])
+        
+        if len(str(ffiber)) == 3:
+            ffiber = str(ffiber)
+        elif len(str(ffiber)) == 2:
+            ffiber = '0' + str(ffiber) 
+        else:
+            ffiber = '00' + str(ffiber)
+
+        if plateid == plate and MJD == mjd and ffiber == Fiber:
+
+            for j in range(10):
+                number = 11+j
+                errorstring = 'Br' + str(number) + ' Error'
+                equivstring = 'Br' + str(number) + ' EqW'
+                hh = row[errorstring]
+                gg = row[equivstring]
+                equivs.append(gg)
+                errors.append(hh)
+
+
+    equivs = np.asarray(equivs)
+    errors = np.asarray(errors)
+    equivs = equivs/equivs[0]
+
+    temps = ['3750 K','5000 K','7500 K','8750 K','10000 K','12500 K','15000 K']
+
+    #loop through densities
+    densityrange = np.arange(8,12.6,0.2)
+    for i in range(len(densityrange)):
+        
+        density = densityrange[i]
+        
+        filename = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Density Files/Density ' + str(8+(i*0.2)) + ' Ratios.csv'
+        openfile = pd.read_csv(filename)
+
+        y = []
+
+        for j in range(len(temps)):
+
+            y = openfile[temps[j]]
+                    
+            y = np.asarray(y)
+            y = y/ y[0]
+            plt.figure(figsize=(20,10))
+            plt.plot(np.arange(11,21,1),y,color='purple',label = temps[j])
+            plt.scatter(np.arange(11,21,1),equivs,color='purple',label='_nolabel_')
+            plt.errorbar(np.arange(11,21,1),equivs,errors,ecolor='red',fmt='--o',elinewidth = 1,capsize = 5,label='Br Emission Lines')
+            plt.xticks(np.arange(11,21,1))
+            plt.legend(bbox_to_anchor=(1,1),fontsize=18)
+            plt.grid(True,color='grey',ls='dashed',alpha=0.7)
+            plt.title('Density ' + str(density))
+            plt.xlabel('Brackett Lines',fontsize = 18)
+            plt.ylabel('Ratios',fontsize = 18)
+            #plt.show()
+            savestring = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/test/D' + str(density) + 'T' + str(temps[j]) + '.pdf'
+            plt.savefig(savestring,bbox_inches='tight',dpi=300)
+            plt.close()
