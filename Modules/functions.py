@@ -196,7 +196,7 @@ def Skyline_Plotter(plateid,MJD,fiber,emission_line):
     wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
 
     #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
-    EqW,EqW_rounded,vbc,vhelio,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
+    equivs,Fluxcontinuum,shift,rest_wavelength,centerline = functions.Br_EqW(wave,spec,emission_line,vbc)
 
     #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
     title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
@@ -532,41 +532,7 @@ def SB_CSV(savefile):
         plt.legend(bbox_to_anchor=(1,1))
         plt.show()
 
-def hundred_plotter(filename):
 
-    import csv
-    import functions
-    import matplotlib.pyplot as plt
-
-    with open(filename) as csvfile:
-
-        reader = csv.reader(csvfile,delimiter = '\t')
-        i = 0
-        x = []
-        for row in reader:
-            if i < 102:
-                x.append(row)
-                i += 1
-            else:
-                break
-    #return x
-    print(len(x))
-    for k in range(len(x)):
-        if k != 0:
-            line = 11
-            plate = int(x[k][2])
-            MJD = int(x[k][3])
-            if len(x[k][4]) == 3:
-                fiber = x[k][4]
-            if len(x[k][4]) == 2:
-                fiber = '0'+x[k][4]
-            if len(x[k][4]) == 1:
-                fiber = '00'+x[k][4]
-            y = functions.Br_Equiv_Width_Plotter(plate,MJD,fiber,line)
-            print(fiber)
-            title = x[k][2]+'-'+x[k][3]+'-'+fiber
-            plt.savefig('/Users/ballanr/Desktop/Test/'+title+'-'+str(line)+'.png')
-            plt.close()
 
 def twomass_uniqueness(filename,savefile):
     import csv
@@ -789,7 +755,7 @@ def Br_EqW(wave,spec,line,vbc):
     #EqW_rounded = round(EqW1/Fluxcontinuum,5)
         equivs = EqW1/Fluxcontinuum
     
-    return equivs,Fluxcontinuum,shift,rest_wavelength
+    return equivs,Fluxcontinuum,shift,rest_wavelength,centerline
 
 
 def Confidence_Level(wave,flux,snr,restwave):
@@ -913,6 +879,152 @@ def skylines_cleaner(wave,flux):
 
     return flux
 
+def DR13_Brackett_Catalog():
+
+    import functions
+    import pandas as pd
+    from astropy.io import fits as fits
+    import numpy as np
+    import itertools
+    from PyAstronomy.pyasl import helcorr as helcorr
+
+    dr13table = pd.read_csv('/Users/ballanr/Desktop/File Outputs/DR13/Visits.csv',delimiter='\t')
+    problems = []
+    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','S/R','Model Density','Model Temp','Overall Confidence',
+            'Br11 Error','Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error',
+            'Br19 Error','Br20 Error','Br11 EqW','Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW',
+            'Br18 EqW','Br19 EqW','Br20 EqW']
+
+    rowstart = 500000
+    #rowend = rowstart + 100000
+
+    df = pd.DataFrame(columns = cols)
+    g = 0
+
+    for index,row in itertools.islice(dr13table.iterrows(),rowstart,None):
+        try:
+            g+=1
+            loc = row['Location ID']
+            twomass = row['2Mass ID']
+            print(str(g))
+            plateid = row['Plate']
+            mjd = row['MJD']
+            
+            if len(str(row['Fiber'])) == 3:
+                fiber = str(row['Fiber'])
+            elif len(str(row['Fiber'])) == 2:
+                fiber = '0' + str(row['Fiber']) 
+            else:
+                fiber = '00' + str(row['Fiber'])
+
+            fitsfile = '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'+str(plateid)+'/'+str(mjd)+'/apVisit-r6-'+str(plateid)+'-'+str(mjd)+'-'+str(fiber)+'.fits'
+
+            #this passes a filepath that astropy can open with fits, circumventing apogee entirely...
+            
+            openfile = fits.open(fitsfile)
+
+            header = openfile[0].header
+
+            snr = header['SNR'] 
+            ra = header['RA']
+            dec = header['DEC'] 
+            jd = header['JD-MID']
+            
+            height = 2788
+            longg = -105.4913
+            lat = 36.4649
+
+            vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+
+            c = 299792.458
+            lamshift = 1 + (vbc/c)
+            
+            fspec = openfile[1]
+            ferr = openfile[2]
+            fwave = openfile[4]
+            wave = []
+            flux = []
+            error = []
+            
+            for i in range(len(fwave.data[2])):
+                wave.append(fwave.data[2][-i-1])
+                flux.append(fspec.data[2][-i-1])
+                error.append(ferr.data[2][-i-1])
+            for j in range(len(fwave.data[1])):
+                wave.append(fwave.data[1][-j-1])
+                flux.append(fspec.data[1][-j-1])
+                error.append(ferr.data[2][-j-1])
+            for k in range(len(fwave.data[0])):
+                wave.append(fwave.data[0][-k-1])
+                flux.append(fspec.data[0][-k-1])
+                error.append(ferr.data[2][-k-1])
+            
+            openfile.close()
+            
+            newflux = functions.skylines_cleaner(wave,flux)
+            
+            #now we run equiv width calc
+            lines = [11,12,13,14,15,16,17,18,19,20]
+            EqW = []
+            restwaves = []
+            econfidences = []
+            confidences = []
+            equivs_error = []
+            equiv_check = 1000
+            
+            wave = np.asarray(wave) * lamshift #check which direction shift is going
+
+            for i in range(10):
+                
+                equiv_width,fcontinuum,shift,rest_wavelength,centers = functions.Br_EqW(wave,newflux,lines[i],vbc)
+                rest = rest_wavelength*(10**10)
+                EqW.append(equiv_width)
+                restwaves.append(rest)
+                
+                dEqW = functions.Br_Error(wave,newflux,error,lines[i],rest)
+                equivs_error.append(dEqW)
+                
+                if i == 0:
+                    equiv_check = equiv_width
+            
+            if equiv_check > 0:
+                
+                modeldens,modeltemp = functions.Model_Fitter(EqW)
+
+                for k in range(len(restwaves)):
+
+                    Confidence,ebbet,arearatios = functions.Confidence_Level(wave,flux,snr,restwaves[k])
+                    #econfidences.append(ebbet)
+                    confidences.append(Confidence)
+
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,confidences[0],equivs_error[0],equivs_error[1],
+                        equivs_error[2],equivs_error[3],equivs_error[4],equivs_error[5],equivs_error[6],equivs_error[7],
+                        equivs_error[8],equivs_error[9],EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+
+                df.loc[len(df)+1] = data
+
+                df1 = pd.DataFrame(wave,columns=['Wavelength'])
+                df1['Flux'] = newflux
+                df1['Error'] = error
+                filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+                df1.to_csv('/Users/ballanr/Desktop/File Outputs/DR13/Wave and Flux/'+filename,index=False)
+                df1 = df1.iloc[0:0]                        
+
+        except KeyError:
+            print('Row '+str(g)+' has no BC value...')
+            problems.append((loc,twomass,plateid,mjd,fiber,'KeyError'))
+            openfile.close()
+        
+        except FileNotFoundError:
+            print('Row '+str(g)+' doesn\'t exist...')
+            problems.append((loc,twomass,plateid,mjd,fiber,'FileNotFound'))
+
+
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR13/Section 6.csv',index=False)
+    df = df.iloc[0:0]
+
+    probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
+    probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR13/Section 6 Problems.csv',index=False)
 
 def DR15_Brackett_Catalog():
 
@@ -923,14 +1035,14 @@ def DR15_Brackett_Catalog():
     import itertools
     from PyAstronomy.pyasl import helcorr as helcorr
 
-    dr15table = pd.read_csv('/Users/ballanr/Desktop/File Outputs/forMdot_analysis.csv')
+    dr15table = pd.read_csv('/Users/ballanr/Desktop/File Outputs/DR15/forMdot_analysis.csv')
     problems = []
-    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','S/R','Overall Confidence','Br11 Error',
-            'Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error',
-            'Br19 Error','Br20 Error','Br11 EqW','Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW',
-            'Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW']
+    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','S/R','Model Density','Model Temp','Overall Confidence',
+            'Br11 Error','Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error',
+            'Br19 Error','Br20 Error','Br11 EqW','Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW',
+            'Br18 EqW','Br19 EqW','Br20 EqW']
 
-    rowstart = 1000
+    rowstart = 0
 
     df = pd.DataFrame(columns = cols)
     g = 0
@@ -1015,12 +1127,12 @@ def DR15_Brackett_Catalog():
 
             for i in range(10):
                 
-                equiv_width,fcontinuum,shift,rest_wavelength = functions.Br_EqW(wave,newflux,lines[i],vbc)
+                equiv_width,fcontinuum,shift,rest_wavelength,centers = functions.Br_EqW(wave,newflux,lines[i],vbc)
                 rest = rest_wavelength*(10**10)
                 EqW.append(equiv_width)
                 restwaves.append(rest)
                 
-                dEqW = functions.Br_Error(wave,newflux,error,lines[i])
+                dEqW = functions.Br_Error(wave,newflux,error,lines[i],rest)
                 equivs_error.append(dEqW)
                 
                 if i == 0:
@@ -1028,13 +1140,15 @@ def DR15_Brackett_Catalog():
             
             if equiv_check > 0:
                 
+                modeldens,modeltemp = functions.Model_Fitter(EqW,equivs_error)
+
                 for k in range(len(restwaves)):
 
                     Confidence,ebbet,arearatios = functions.Confidence_Level(wave,flux,snr,restwaves[k])
                     #econfidences.append(ebbet)
                     confidences.append(Confidence)
 
-                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,confidences[0],equivs_error[0],equivs_error[1],
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,confidences[0],equivs_error[0],equivs_error[1],
                         equivs_error[2],equivs_error[3],equivs_error[4],equivs_error[5],equivs_error[6],equivs_error[7],
                         equivs_error[8],equivs_error[9],EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
 
@@ -1057,70 +1171,75 @@ def DR15_Brackett_Catalog():
             problems.append((loc,twomass,plateid,mjd,fiber,'FileNotFound'))
 
 
-    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Catalog-test.csv',index=False)
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15.csv',index=False)
     df = df.iloc[0:0]
 
     probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
-    probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Catalog Problems-test.csv',index=False)
+    probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Problems.csv',index=False)
 
-def Br_Error(wave,flux,err,line):
+def Br_Error(wave,flux,err,line,rest):
     
     import functions
     import numpy as np
 
-    emission,nah,nahh = functions.Barycentric_Correction(line,0)
-    center = functions.find_nearest(wave,emission)
-    
-    wave1 = np.asarray(wave[center-301:center+301])
-    flux1 = np.asarray(flux[center-301:center+301])
-    err1 = np.asarray(err[center-301:center+301])
-    
-    L1 = 0
-    L2 = 151
-    R1 = 451
-    R2 = 602
-    
-    lcheck = np.median(err1[L1:L2])
-    for k in range(L1,L2):
-        if err1[k] > 10*lcheck:
-            err1[k] = 10*lcheck
+    #emission,nah,rest = functions.Barycentric_Correction(line,0)
+    #rest = rest * (10**10)
+    try:
+        if len(err) > 0:
+            center = functions.find_nearest(wave,rest)
+            
+            wave1 = np.asarray(wave[center-301:center+301])
+            flux1 = np.asarray(flux[center-301:center+301])
+            err1 = np.asarray(err[center-301:center+301])
+            
+            L1 = 0
+            L2 = 151
+            R1 = 451
+            R2 = 602
+            
+            lcheck = np.median(err1[L1:L2])
+            for k in range(L1,L2):
+                if err1[k] > 10*lcheck:
+                    err1[k] = 10*lcheck
 
 
-    rcheck = np.median(err1[R1:R2])
-    for k in range(R1,R2):
-        if err1[k] > 10*rcheck:
-            err1[k] = 10*rcheck
+            rcheck = np.median(err1[R1:R2])
+            for k in range(R1,R2):
+                if err1[k] > 10*rcheck:
+                    err1[k] = 10*rcheck
+            
+            Fc = (np.sum(flux1[L1:L2]) + np.sum(flux1[R1:R2])) / (len(flux1[L1:L2]) + len(flux1[R1:R2]))
+            dFc = (np.sum(err1[L1:L2]) + np.sum(err1[R1:R2])) / (len(err1[L1:L2]) + len(err1[R1:R2]))
+            
 
+            fluxavg = 0 
+            
+            for i in range(L2,R1):
 
-    
-    Fc = (np.sum(flux1[L1:L2]) + np.sum(flux1[R1:R2])) / (len(flux1[L1:L2]) + len(flux1[R1:R2]))
-    dFc = (np.sum(err1[L1:L2]) + np.sum(err1[R1:R2])) / (len(err1[L1:L2]) + len(err1[R1:R2]))
-    
+                fluxavg += flux1[i] - Fc
+                
+                #A += (0.5)*(wave1[i+1] - wave1[i])*(flux1[i+1] + flux1[i] - (2*Fc))
+            
+            N = len(wave1[L2:R1])
+            fluxavg = fluxavg / N
+            del_lam = wave1[2] - wave1[1]    
+            A = N*del_lam*fluxavg
 
-    fluxavg = 0 
-    
-    for i in range(L2,R1):
+            dA = 0
+            for k in range(L2,R1):
 
-        fluxavg += flux1[i] - Fc
-        
-        #A += (0.5)*(wave1[i+1] - wave1[i])*(flux1[i+1] + flux1[i] - (2*Fc))
-    
-    N = len(wave1[L2:R1])
-    fluxavg = fluxavg / N
-    del_lam = wave1[2] - wave1[1]    
-    A = N*del_lam*fluxavg
+                #dA += (0.5)*(wave1[k+1] - wave1[k])*(err1[k+1] + err1[k] + (2*dFc))
 
-    dA = 0
-    for k in range(L2,R1):
+                dA += err[k]**2
 
-        #dA += (0.5)*(wave1[k+1] - wave1[k])*(err1[k+1] + err1[k] + (2*dFc))
+            dA = del_lam * np.sqrt(dA)
 
-        dA += err[k]**2
-
-    dA = del_lam * np.sqrt(dA)
-
-    dEqW = (1/(Fc**2)) * np.sqrt( (Fc*dA)**2 + (A*dFc)**2 )
-    #EqW = A / Fc
+            dEqW = (1/(Fc**2)) * np.sqrt( (Fc*dA)**2 + (A*dFc)**2 )
+            #EqW = A / Fc
+        else:
+            dEqW = 0
+    except IndexError:
+        dEqW = 0
 
     return dEqW
 
@@ -1168,7 +1287,15 @@ def Brackett_Ratios_Updated(plate,mjd,fiber):
 
     equivs = np.asarray(equivs)
     errors = np.asarray(errors)
-    equivs = equivs/equivs[0]
+    equivs1 = equivs/equivs[0]
+
+    summederrors = []
+
+    for i in range(10):
+
+        dq = equivs1[i] * np.sqrt( (errors[i]/equivs[i])**2 + (errors[0]/equivs[0])**2 )
+        summederrors.append(dq)
+        #print(dq)
 
     temps = ['3750 K','5000 K','7500 K','8750 K','10000 K','12500 K','15000 K']
 
@@ -1191,15 +1318,68 @@ def Brackett_Ratios_Updated(plate,mjd,fiber):
             y = y/ y[0]
             plt.figure(figsize=(20,10))
             plt.plot(np.arange(11,21,1),y,color='purple',label = temps[j])
-            plt.scatter(np.arange(11,21,1),equivs,color='purple',label='_nolabel_')
-            plt.errorbar(np.arange(11,21,1),equivs,errors,ecolor='red',fmt='--o',elinewidth = 1,capsize = 5,label='Br Emission Lines')
+            plt.scatter(np.arange(11,21,1),equivs1,color='purple',label='_nolabel_')
+            plt.errorbar(np.arange(11,21,1),equivs1,summederrors,ecolor='red',fmt='--o',elinewidth = 1,capsize = 5,label='Br Emission Lines')
             plt.xticks(np.arange(11,21,1))
             plt.legend(bbox_to_anchor=(1,1),fontsize=18)
             plt.grid(True,color='grey',ls='dashed',alpha=0.7)
             plt.title('Density ' + str(density))
             plt.xlabel('Brackett Lines',fontsize = 18)
-            plt.ylabel('Ratios',fontsize = 18)
+            plt.ylabel('$Br_{N\geq 11}/Br_{11}$',fontsize = 18)
             #plt.show()
             savestring = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/test/D' + str(density) + 'T' + str(temps[j]) + '.pdf'
             plt.savefig(savestring,bbox_inches='tight',dpi=300)
             plt.close()
+
+def Model_Fitter(eqwarray,error):
+    import pandas as pd
+    import numpy as np
+
+    allfile = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Profile Test.csv'
+    openallfile = pd.read_csv(allfile)
+    cols = openallfile.columns
+    eqwarray = np.asarray(eqwarray)
+    eqwarray= eqwarray/eqwarray[0]
+    errors = []
+    test = [(0,0),(0,0),(0,0),(0,0),(0,0),(0,0),(0,0),(0,0),(0,0),(0,0)]
+
+    for i in range(10):
+
+        dq = eqwarray[i] * np.sqrt( (error[i]/eqwarray[i])**2 + (error[0]/eqwarray[0])**2 )
+        errors.append(dq)
+
+    resid = []
+    for i in range(len(cols)):
+        
+        A = openallfile[cols[i]]
+        
+        b = eqwarray
+        
+        A = A / A[0]
+        
+        r = b - A
+        
+        r2 = 0
+        
+        for k in range(len(r)):
+            w = 1/(errors[k])**2
+            r2 += w * (r[k])**2
+            test[k]=(k,w)
+        
+        r2 = np.sqrt(r2)
+        resid.append((i,r2))
+    
+    x = min(b for (a,b) in resid)
+    y = np.where(resid == x)
+    model = cols[y[0][0]]
+    
+    
+    if model.startswith('1'):
+        dens = float(model[:4])
+        temp = int(model[5:])
+
+    else:
+        dens = float(model[:3])
+        temp = int(model[4:])
+
+    return dens,temp
