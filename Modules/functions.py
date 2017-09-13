@@ -1,3 +1,41 @@
+def Directory_Walk():
+
+    import os
+    import numpy as np
+    import pandas as pd
+
+    directory = '/Volumes/CoveyData/APOGEE_Spectra/APOGEE2_DR14/dr14/apogee/spectro/redux/r8/apo25m/'
+    plates = []
+    mjd = []
+    fibers = []
+    path = []
+
+    df = pd.DataFrame(columns=['Plate','MJD','Fiber','Path'])
+
+    for root,dirs,files in os.walk(directory):
+        for name in files:
+            #x = os.path.join(root,name)
+            if len(name) == 30:
+                plates.append(name[11:15])
+                mjd.append(name[16:21])
+                fibers.append(name[22:25])
+                path.append(name)
+                print(name)
+            
+            elif len(name) == 31:
+                plates.append(name[11:16])
+                mjd.append(name[17:22])
+                fibers.append(name[23:26])
+                path.append(name)
+                print(name)
+    
+    df['Plate'] = plates
+    df['MJD'] = mjd
+    df['Fiber'] = fibers
+    df['Path'] = path
+
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR14/DR14 List.csv',index=False)
+
 def apVisit_Catalog_Output(filename,savefile):
     '''
     Notes:
@@ -731,10 +769,13 @@ def Br_EqW(wave,spec,line,vbc):
     rest = rest_wavelength*(10**10)
     centerline = functions.find_nearest(wave,rest)
     
+    #regular windows
+
     L1 = centerline - 301 # ~ 27.42 Angstroms
     L2 = centerline - 150 # ~ 17.21 Angstroms
     R1 = centerline + 150
     R2 = centerline + 301
+
 
     Fluxcontinuum = (np.sum(spec[L1:L2])+np.sum(spec[R1:R2])) / (len(spec[L1:L2])+len(spec[R1:R2]))
     EqW1 = 0
@@ -758,7 +799,7 @@ def Br_EqW(wave,spec,line,vbc):
     return equivs,Fluxcontinuum,shift,rest_wavelength,centerline
 
 
-def Confidence_Level(wave,flux,snr,restwave):
+def Confidence_Level(wave,flux,restwave):
 
     import numpy as np
     import functions
@@ -779,55 +820,8 @@ def Confidence_Level(wave,flux,snr,restwave):
     cerr = (0.5)*(lefterr + righterr)
     confidence1 = (linemean - cmean)/cerr
     
-    #method 2
-    n_l = len(wave[L2:R1])
-    n_c = len(wave[L1:L2])+len(wave[R1:R2])
-    l = linemean
-    c = cmean
-    dellam = wave[L1+1]-wave[L1]
-    r = l/c
-    top = n_l*(dellam)**2
-    bottom = snr**2
-    sig = (top/bottom)*(r/n_c)*(r+n_c)
-    ebbets = np.sqrt(sig)
-    
-    #method 4
-    abovex = []
-    abovey = []
-    belowx = []
-    belowy = []
-
-    for k in range(R1-L2):
-        x = wave[L2 + k]
-        y = flux[L2 + k]
-        gy = y - cmean
-        
-        if gy > 0:
-            abovex.append(x)
-            abovey.append(y)
-        else:
-            belowx.append(x)
-            belowy.append(y)
-
-    aboveArea = 0
-    belowArea = 0
-
-    for i in range(len(abovex)-1):
-
-                trapezoid = (0.5)*(abovex[i+1] - abovex[i])*(abovey[i+1] + abovey[i] - (2*cmean))
-                aboveArea += trapezoid
-
-    for j in range(len(belowx)-1):
-
-                trapezoid1 = (0.5)*(belowx[j+1] - belowx[j])*(-belowy[j+1] - belowy[j] + (2*cmean))
-                belowArea += trapezoid1
-
-    if belowArea != 0:
-        funratio = (aboveArea / belowArea)
-    else: 
-        funratio = aboveArea
           
-    return confidence1,ebbets,funratio
+    return confidence1
 
 def skylines_cleaner(wave,flux):
     
@@ -991,13 +985,9 @@ def DR13_Brackett_Catalog():
                 
                 modeldens,modeltemp = functions.Model_Fitter(EqW)
 
-                for k in range(len(restwaves)):
+                Confidence = functions.Confidence_Level(wave,flux,restwaves[0])
 
-                    Confidence,ebbet,arearatios = functions.Confidence_Level(wave,flux,snr,restwaves[k])
-                    #econfidences.append(ebbet)
-                    confidences.append(Confidence)
-
-                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,confidences[0],equivs_error[0],equivs_error[1],
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,Confidence,equivs_error[0],equivs_error[1],
                         equivs_error[2],equivs_error[3],equivs_error[4],equivs_error[5],equivs_error[6],equivs_error[7],
                         equivs_error[8],equivs_error[9],EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
 
@@ -1025,6 +1015,153 @@ def DR13_Brackett_Catalog():
 
     probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
     probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR13/Section 6 Problems.csv',index=False)
+def DR14_Brackett_Catalog():
+
+    import functions
+    import pandas as pd
+    from astropy.io import fits as fits
+    import numpy as np
+    import itertools
+    from PyAstronomy.pyasl import helcorr as helcorr
+
+    dr14table = pd.read_csv('/Users/ballanr/Desktop/File Outputs/DR14/DR14 List.csv')
+    problems = []
+    cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','S/R','Model Density','Model Temp','Overall Confidence',
+            'Br11 Error','Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error',
+            'Br19 Error','Br20 Error','Br11 EqW','Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW',
+            'Br18 EqW','Br19 EqW','Br20 EqW']
+
+    rowstart = 0
+
+    df = pd.DataFrame(columns = cols)
+    g = 0
+
+    for index,row in itertools.islice(dr14table.iterrows(),rowstart,rowstart+50000):
+        try:
+            g+=1
+            print(str(g))
+
+            plateid = row['Plate']
+            mjd = row['MJD']
+            
+            if len(str(row['Fiber'])) == 3:
+                fiber = str(row['Fiber'])
+            elif len(str(row['Fiber'])) == 2:
+                fiber = '0' + str(row['Fiber']) 
+            else:
+                fiber = '00' + str(row['Fiber'])
+
+            endpath = row['Path']
+            
+            fitsfile = '/Volumes/CoveyData/APOGEE_Spectra/APOGEE2_DR14/dr14/apogee/spectro/redux/r8/apo25m/'+str(plateid)+'/'+str(mjd)+'/'+endpath
+
+            #this passes a filepath that astropy can open with fits, circumventing apogee entirely...
+            
+            openfile = fits.open(fitsfile)
+
+            header = openfile[0].header
+
+            ra = header['RA']
+            dec = header['DEC'] 
+            jd = header['JD-MID']
+            loc = header['LOCID']
+            twomass = header['OBJID']
+            snr = header['SNR']
+            
+            height = 2788
+            longg = -105.4913
+            lat = 36.4649
+            
+
+            vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+
+            c = 299792.458
+            lamshift = 1 + (vbc/c)
+            
+            fspec = openfile[1]
+            ferr = openfile[2]
+            fwave = openfile[4]
+            wave = []
+            flux = []
+            error = []
+            
+            for i in range(len(fwave.data[2])):
+                wave.append(fwave.data[2][-i-1])
+                flux.append(fspec.data[2][-i-1])
+                error.append(ferr.data[2][-i-1])
+            for j in range(len(fwave.data[1])):
+                wave.append(fwave.data[1][-j-1])
+                flux.append(fspec.data[1][-j-1])
+                error.append(ferr.data[2][-j-1])
+            for k in range(len(fwave.data[0])):
+                wave.append(fwave.data[0][-k-1])
+                flux.append(fspec.data[0][-k-1])
+                error.append(ferr.data[2][-k-1])
+            
+            openfile.close()
+            
+            newflux = functions.skylines_cleaner(wave,flux)
+            
+            #now we run equiv width calc
+            lines = [11,12,13,14,15,16,17,18,19,20]
+            EqW = []
+            restwaves = []
+            econfidences = []
+            confidences = []
+            equivs_error = []
+            equiv_check = 1000
+            
+            wave = np.asarray(wave) * lamshift #check which direction shift is going
+
+            for i in range(10):
+                
+                equiv_width,fcontinuum,shift,rest_wavelength,centers = functions.Br_EqW(wave,newflux,lines[i],vbc)
+                rest = rest_wavelength*(10**10)
+                EqW.append(equiv_width)
+                restwaves.append(rest)
+                
+                dEqW = functions.Br_Error(wave,newflux,error,lines[i],rest)
+                equivs_error.append(dEqW)
+                
+                if i == 0:
+                    equiv_check = equiv_width
+            
+            if equiv_check > 0:
+                
+                modeldens,modeltemp = functions.Model_Fitter(EqW,equivs_error)
+
+                Confidence = functions.Confidence_Level(wave,flux,restwaves[0])
+    
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,Confidence,equivs_error[0],equivs_error[1],
+                        equivs_error[2],equivs_error[3],equivs_error[4],equivs_error[5],equivs_error[6],equivs_error[7],
+                        equivs_error[8],equivs_error[9],EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+
+                df.loc[len(df)+1] = data
+
+                df1 = pd.DataFrame(wave,columns=['Wavelength'])
+                df1['Flux'] = newflux
+                df1['Error'] = error
+                filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+                df1.to_csv('/Users/ballanr/Desktop/File Outputs/DR14/Wave and Flux/'+filename,index=False)
+                df1 = df1.iloc[0:0]                       
+
+        except KeyError:
+            print('Row '+str(g)+' has no BC value...')
+            problems.append((loc,twomass,plateid,mjd,fiber,'KeyError'))
+            openfile.close()
+        
+        except FileNotFoundError:
+            print('Row '+str(g)+' doesn\'t exist...')
+            problems.append((loc,twomass,plateid,mjd,fiber,'FileNotFound'))
+        except IndexError:
+            print('Index '+str(g)+' broke...')
+            problems.append((loc,twomass,plateid,mjd,fiber,'IndexError')) 
+
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR14/DR14 Piece 1.csv',index=False)
+    df = df.iloc[0:0]
+
+    probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
+    probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR14/DR14 Problems 1.csv',index=False)
 
 def DR15_Brackett_Catalog():
 
@@ -1142,24 +1279,20 @@ def DR15_Brackett_Catalog():
                 
                 modeldens,modeltemp = functions.Model_Fitter(EqW,equivs_error)
 
-                for k in range(len(restwaves)):
+                Confidence = functions.Confidence_Level(wave,flux,restwaves[0])
 
-                    Confidence,ebbet,arearatios = functions.Confidence_Level(wave,flux,snr,restwaves[k])
-                    #econfidences.append(ebbet)
-                    confidences.append(Confidence)
-
-                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,confidences[0],equivs_error[0],equivs_error[1],
+                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,Confidence,equivs_error[0],equivs_error[1],
                         equivs_error[2],equivs_error[3],equivs_error[4],equivs_error[5],equivs_error[6],equivs_error[7],
                         equivs_error[8],equivs_error[9],EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
 
                 df.loc[len(df)+1] = data
 
-                df1 = pd.DataFrame(wave,columns=['Wavelength'])
+                '''df1 = pd.DataFrame(wave,columns=['Wavelength'])
                 df1['Flux'] = newflux
                 df1['Error'] = error
                 filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
                 df1.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'+filename,index=False)
-                df1 = df1.iloc[0:0]                        
+                df1 = df1.iloc[0:0]'''                        
 
         except KeyError:
             print('Row '+str(g)+' has no BC value...')
@@ -1169,21 +1302,21 @@ def DR15_Brackett_Catalog():
         except FileNotFoundError:
             print('Row '+str(g)+' doesn\'t exist...')
             problems.append((loc,twomass,plateid,mjd,fiber,'FileNotFound'))
+        except IndexError:
+            print('Index '+str(g)+' broke...')
+            problems.append((loc,twomass,plateid,mjd,fiber,'IndexError')) 
 
-
-    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15.csv',index=False)
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 changing continuum.csv',index=False)
     df = df.iloc[0:0]
 
     probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
-    probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Problems.csv',index=False)
+    #probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Problems.csv',index=False)
 
 def Br_Error(wave,flux,err,line,rest):
     
     import functions
     import numpy as np
 
-    #emission,nah,rest = functions.Barycentric_Correction(line,0)
-    #rest = rest * (10**10)
     try:
         if len(err) > 0:
             center = functions.find_nearest(wave,rest)
@@ -1218,7 +1351,6 @@ def Br_Error(wave,flux,err,line,rest):
 
                 fluxavg += flux1[i] - Fc
                 
-                #A += (0.5)*(wave1[i+1] - wave1[i])*(flux1[i+1] + flux1[i] - (2*Fc))
             
             N = len(wave1[L2:R1])
             fluxavg = fluxavg / N
@@ -1228,14 +1360,13 @@ def Br_Error(wave,flux,err,line,rest):
             dA = 0
             for k in range(L2,R1):
 
-                #dA += (0.5)*(wave1[k+1] - wave1[k])*(err1[k+1] + err1[k] + (2*dFc))
 
                 dA += err[k]**2
 
             dA = del_lam * np.sqrt(dA)
 
             dEqW = (1/(Fc**2)) * np.sqrt( (Fc*dA)**2 + (A*dFc)**2 )
-            #EqW = A / Fc
+            
         else:
             dEqW = 0
     except IndexError:
@@ -1383,3 +1514,426 @@ def Model_Fitter(eqwarray,error):
         temp = int(model[4:])
 
     return dens,temp
+
+def Brackett_Ratios_Updated_Grid(plate,mjd,fiber):
+
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import itertools
+    import seaborn as sb
+    
+    #import matplotlib as mpl
+    #mpl.rcParams.update(mpl.rcParamsDefault)
+
+    #finding the equivalent widths and errors for a given visit
+    filefile = pd.read_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Cutoff.csv')
+
+    if len(str(fiber)) == 3:
+        Fiber = str(fiber)
+    elif len(str(fiber)) == 2:
+        Fiber = '0' + str(fiber) 
+    else:
+        Fiber = '00' + str(fiber)
+    equivs = []
+    errors = []
+    for index,row in itertools.islice(filefile.iterrows(),0,None):
+        plateid = int(row['Plate ID'])
+        MJD = int(row['MJD'])
+        modeldens = str(row['Model Density'])
+        modelt = str(row['Model Temp'])
+        ffiber = str(row['Fiber'])
+        
+        if len(str(ffiber)) == 3:
+            ffiber = str(ffiber)
+        elif len(str(ffiber)) == 2:
+            ffiber = '0' + str(ffiber) 
+        else:
+            ffiber = '00' + str(ffiber)
+
+        if plateid == plate and MJD == mjd and ffiber == Fiber:
+
+            for j in range(10):
+                number = 11+j
+                errorstring = 'Br' + str(number) + ' Error'
+                equivstring = 'Br' + str(number) + ' EqW'
+                hh = row[errorstring]
+                gg = row[equivstring]
+                equivs.append(gg)
+                errors.append(hh)
+
+
+            equivs = np.asarray(equivs)
+            errors = np.asarray(errors)
+            equivs1 = equivs/equivs[0]
+
+            summederrors = []
+
+            for i in range(10):
+
+                dq = equivs1[i] * np.sqrt( (errors[i]/equivs[i])**2 + (errors[0]/equivs[0])**2 )
+                summederrors.append(dq)
+                #print(dq)
+
+            temps = ['3750 K','5000 K','7500 K','8750 K','10000 K','12500 K','15000 K']
+
+            d8T3750 = np.asarray([0.05071,0.04067,0.03307,0.02709,0.02237,0.01835,0.01527,0.01281,0.01081,0.009207])
+            d8T8750 = np.asarray([0.04492,0.03533,0.02837,0.02307,0.019,0.01573,0.01313,0.01105,0.009374,0.00801])
+            d8T15000 = np.asarray([0.02642,0.02042,0.01618,0.01303,0.01067,0.008821,0.007353,0.006188,0.005252,0.004492])
+            d10T3750 = np.asarray([0.03951,0.03036,0.02369,0.01874,0.01503,0.01222,0.01006,0.008374,0.007042,0.005979])
+            d10T8750 = np.asarray([0.02256,0.01705,0.01321,0.01044,0.008401,0.006864,0.005682,0.00476,0.004027,0.003437])
+            d10T15000 = np.asarray([0.01032,0.00755,0.00576,0.004524,0.003634,0.00297,0.002463,0.002068,0.001753,0.001499])
+            d12T3750 = np.asarray([0.2249,0.1888,0.1567,0.1297,0.1077,0.09002,0.07573,0.06418,0.05477,0.04704])
+            d12T8750 = np.asarray([0.9622,1.027,1.079,1.12,1.149,1.162,1.159,1.139,1.104,1.058])
+            d12T15000 = np.asarray([1.082,1.167,1.23,1.267,1.274,1.253,1.208,1.147,1.076,0.9992])
+
+            filename = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Density Files/Density ' + modeldens + ' Ratios.csv'
+            openfile = pd.read_csv(filename)
+
+            y = openfile[modelt+ ' K']
+            y = np.asarray(y)
+            y = y/y[0]
+
+            plt.figure(figsize=(20,10))
+            plt.title(str(plateid)+'-'+str(MJD)+'-'+ffiber,fontsize=24)
+            plt.xticks((np.arange(11,21,1)))
+            plt.plot(np.arange(11,21,1),y,color=sb.xkcd_rgb['black'],label='Best Fit, Density: '+str(modeldens)+' Temp: '+str(modelt))
+            plt.scatter(np.arange(11,21,1),y,color=sb.xkcd_rgb['black'])
+            plt.errorbar(np.arange(11,21,1),equivs1,yerr=summederrors,ecolor='red',fmt='-o',color=sb.xkcd_rgb['blue'],label='Br Emission')
+
+            plt.plot(np.arange(11,21,1),d8T3750/d8T3750[0],color=sb.xkcd_rgb['red'],ls='dashed',label='Density: 8 Temp: 3750')
+            plt.plot(np.arange(11,21,1),d8T8750/d8T8750[0],color=sb.xkcd_rgb['red'],ls='dashdot',label='Density: 8 Temp: 8750')
+            plt.plot(np.arange(11,21,1),d8T15000/d8T15000[0],color=sb.xkcd_rgb['red'],ls='solid',label='Density: 8 Temp: 15000')
+            plt.plot(np.arange(11,21,1),d10T3750/d10T3750[0],color=sb.xkcd_rgb['forest green'],ls='dashed',label='Density: 10 Temp: 3750')
+            plt.plot(np.arange(11,21,1),d10T8750/d10T8750[0],color=sb.xkcd_rgb['forest green'],ls='dashdot',label='Density: 10 Temp: 8750')
+            plt.plot(np.arange(11,21,1),d10T15000/d10T15000[0],color=sb.xkcd_rgb['forest green'],ls='solid',label='Density: 10 Temp: 15000')
+            plt.plot(np.arange(11,21,1),d12T3750/d12T3750[0],color=sb.xkcd_rgb['purple'],ls='dashed',label='Density: 12 Temp: 3750')
+            plt.plot(np.arange(11,21,1),d12T8750/d12T8750[0],color=sb.xkcd_rgb['purple'],ls='dashdot',label='Density: 12 Temp: 8750')
+            plt.plot(np.arange(11,21,1),d12T15000/d12T15000[0],color=sb.xkcd_rgb['purple'],ls='solid',label='Density: 12 Temp: 15000')
+            plt.grid(True)
+            plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), shadow=True, ncol=4,frameon=True,facecolor=None,framealpha=1,fontsize=16)
+            plt.savefig('/Users/ballanr/Desktop/'+str(plate) +'-' +str(mjd) +'-'+str(fiber) + '.pdf',bbox_inches='tight',dpi=300)
+            #plt.show()
+
+def Aitoff(dr):
+    from astropy.coordinates import SkyCoord  # High-level coordinates
+    from astropy.coordinates import ICRS, Galactic, FK4, FK5  # Low-level frames
+    from astropy.coordinates import Angle, Latitude, Longitude  # Angles
+    import astropy.units as u
+    import pandas as pd
+    import numpy as np
+    import itertools
+    from astropy.io import fits
+    import matplotlib.pyplot as plt
+
+
+    if dr == 13:
+        glong = []
+        glat = []
+        error = []
+
+        file1 = '/Users/ballanr/Desktop/File Outputs/DR13/DR13 Protostars.csv'
+        openfile = pd.read_csv(file1)
+
+        for index,row in itertools.islice(openfile.iterrows(),0,None):
+            try:
+                plate = row['Plate ID']
+                mjd = row['MJD']
+                if len(str(row['Fiber'])) == 3:
+                    fiber = str(row['Fiber'])
+                elif len(str(row['Fiber'])) == 2:
+                    fiber = '0' + str(row['Fiber']) 
+                else:
+                    fiber = '00' + str(row['Fiber'])
+
+                server = '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
+                filepath = str(plate) + '/' + str(mjd) + '/' + 'apVisit-r6-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+               
+                fitsfile = fits.open(server+filepath)
+
+                Glon = fitsfile[0].header['GLON']
+                Glat = fitsfile[0].header['GLAT']
+
+                glong.append(Glon)
+                glat.append(Glat)
+            
+            except KeyError:
+                #print('This has no coords...')
+                error.append((plate,mjd,fiber))
+
+        glong = np.asarray(glong)
+        glat = np.asarray(glat)
+
+        glong1 = []
+        glat1 = []
+        error1 = []
+
+        file1 = '/Users/ballanr/Desktop/File Outputs/DR13/DR13.csv'
+        openfile = pd.read_csv(file1)
+
+        for index,row in itertools.islice(openfile.iterrows(),0,None):
+            try:
+                plate = row['Plate ID']
+                mjd = row['MJD']
+                if len(str(row['Fiber'])) == 3:
+                    fiber = str(row['Fiber'])
+                elif len(str(row['Fiber'])) == 2:
+                    fiber = '0' + str(row['Fiber']) 
+                else:
+                    fiber = '00' + str(row['Fiber'])
+
+                server = '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
+                filepath = str(plate) + '/' + str(mjd) + '/' + 'apVisit-r6-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+                
+                fitsfile = fits.open(server+filepath)
+
+                Glon = fitsfile[0].header['GLON']
+                Glat = fitsfile[0].header['GLAT']
+
+                glong1.append(Glon)
+                glat1.append(Glat)
+
+            except KeyError:
+                #print('This has no coords...')
+                error1.append((plate,mjd,fiber))
+
+        glong1 = np.asarray(glong1)
+        glat1 = np.asarray(glat1)
+
+    elif dr == 14:
+        
+        glong = []
+        glat = []
+        error = []
+
+        file1 = '/Users/ballanr/Desktop/File Outputs/DR14/DR14 Protostars.csv'
+        openfile = pd.read_csv(file1)
+
+        for index,row in itertools.islice(openfile.iterrows(),0,None):
+            try:
+                plate = row['Plate ID']
+                mjd = row['MJD']
+                if len(str(row['Fiber'])) == 3:
+                    fiber = str(row['Fiber'])
+                elif len(str(row['Fiber'])) == 2:
+                    fiber = '0' + str(row['Fiber']) 
+                else:
+                    fiber = '00' + str(row['Fiber'])
+
+
+                if plate > 9700:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
+                    filepath = str(plate) + '/' + str(mjd) + '/' + 'asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+                else:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+                    filepath = str(plate) + '/' + str(mjd) + '/' + 'apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+
+                fitsfile = fits.open(server+filepath)
+
+                Glon = fitsfile[0].header['GLON']
+                Glat = fitsfile[0].header['GLAT']
+
+                glong.append(Glon)
+                glat.append(Glat)
+            except KeyError:
+                #print('This has no coords...')
+                error.append((plate,mjd,fiber))
+
+        glong = np.asarray(glong)
+        glat = np.asarray(glat)
+
+        glong1 = []
+        glat1 = []
+        error1 = []
+
+        file1 = '/Users/ballanr/Desktop/File Outputs/DR15/forMdot_analysis.csv'
+        openfile = pd.read_csv(file1)
+
+        for index,row in itertools.islice(openfile.iterrows(),0,None):
+            try:
+                plate = row['PLATE']
+                mjd = row['MJD']
+                if len(str(row['FIB'])) == 3:
+                    fiber = str(row['FIB'])
+                elif len(str(row['FIB'])) == 2:
+                    fiber = '0' + str(row['FIB']) 
+                else:
+                    fiber = '00' + str(row['FIB'])
+
+                if plate > 9700:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
+                    filepath = str(plate) + '/' + str(mjd) + '/' + 'asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+                else:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+                    filepath = str(plate) + '/' + str(mjd) + '/' + 'apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+
+                fitsfile = fits.open(server+filepath)
+
+                Glon = fitsfile[0].header['GLON']
+                Glat = fitsfile[0].header['GLAT']
+
+                glong1.append(Glon)
+                glat1.append(Glat)
+
+            except KeyError:
+                #print('This has no coords...')
+                error1.append((plate,mjd,fiber))
+
+        glong1 = np.asarray(glong1)
+        glat1 = np.asarray(glat1)
+            
+        
+    elif dr == 15:
+        
+        RA = []
+        DEC = []
+        error = []
+
+        file1 = '/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Cutoff.csv'
+        openfile = pd.read_csv(file1)
+
+        for index,row in itertools.islice(openfile.iterrows(),0,None):
+            try:
+                plate = row['Plate ID']
+                mjd = row['MJD']
+                if len(str(row['Fiber'])) == 3:
+                    fiber = str(row['Fiber'])
+                elif len(str(row['Fiber'])) == 2:
+                    fiber = '0' + str(row['Fiber']) 
+                else:
+                    fiber = '00' + str(row['Fiber'])
+
+
+                if plate > 9700:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
+                    filepath = str(plate) + '/' + str(mjd) + '/' + 'asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+                else:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+                    filepath = str(plate) + '/' + str(mjd) + '/' + 'apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+
+                fitsfile = fits.open(server+filepath)
+
+                rra = fitsfile[0].header['RA']
+                ddec = fitsfile[0].header['DEC']
+
+                RA.append(rra)
+                DEC.append(ddec)
+
+            except KeyError:
+                #print('This has no coords...')
+                error.append((plate,mjd,fiber))
+
+        RA = np.asarray(RA)
+        DEC = np.asarray(DEC)
+
+        RA1 = []
+        DEC1 = []
+        error1 = []
+
+        file1 = '/Users/ballanr/Desktop/File Outputs/DR15/forMdot_analysis.csv'
+        openfile = pd.read_csv(file1)
+
+        for index,row in itertools.islice(openfile.iterrows(),0,None):
+            try:
+                plate = row['PLATE']
+                mjd = row['MJD']
+                if len(str(row['FIB'])) == 3:
+                    fiber = str(row['FIB'])
+                elif len(str(row['FIB'])) == 2:
+                    fiber = '0' + str(row['FIB']) 
+                else:
+                    fiber = '00' + str(row['FIB'])
+
+                if plate > 9700:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
+                    filepath = str(plate) + '/' + str(mjd) + '/' + 'asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+                else:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+                    filepath = str(plate) + '/' + str(mjd) + '/' + 'apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+
+                fitsfile = fits.open(server+filepath)
+
+                rra1 = fitsfile[0].header['RA']
+                ddec1 = fitsfile[0].header['DEC']
+
+                RA1.append(rra1)
+                DEC1.append(ddec1)
+
+            except KeyError:
+                #print('This has no coords...')
+                error1.append((plate,mjd,fiber))
+
+        RA1 = np.asarray(RA1)
+        DEC1 = np.asarray(DEC1)
+    
+    fig=plt.figure(figsize=(20,10))
+
+    c1 = SkyCoord(ra=RA*u.degree , dec = DEC*u.degree, frame='icrs')
+    c1 = c1.galactic
+    c2 = SkyCoord(ra=RA1*u.degree , dec = DEC1*u.degree, frame='icrs')
+    c2 = c2.galactic
+
+    longg=c1.l.wrap_at(180*u.deg).radian
+    latg=c1.b.radian
+    longg1=c2.l.wrap_at(180*u.deg).radian
+    latg1=c2.b.radian
+
+    ax = plt.subplot(111,projection='aitoff')
+    ax.tick_params(axis='y', labelsize=20)
+    ax.tick_params(axis='x',labelsize=16)
+    ax.grid(True)
+
+    ax.scatter(longg1,latg1,s=2,color='green',alpha=0.1)
+    ax.scatter(longg,latg,s=100,color='red',marker='*',edgecolor='black',linewidth=0.5)
+
+    #plt.show()
+    plt.savefig('/Users/ballanr/Desktop/Aitoff3.png',bbox_inches='tight',dpi=300)
+
+def testest():
+
+    from astropy.coordinates import SkyCoord  # High-level coordinates
+    from astropy.coordinates import ICRS, Galactic, FK4, FK5  # Low-level frames
+    from astropy.coordinates import Angle, Latitude, Longitude  # Angles
+    import astropy.units as u
+    import pandas as pd
+    import numpy as np
+    import itertools
+    from astropy.io import fits
+    import matplotlib.pyplot as plt
+
+    plate = '9246'
+    mjd = '57650'
+    fiber = '291'
+
+
+    if int(plate) > 9700:
+        server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
+        filepath = str(plate) + '/' + str(mjd) + '/' + 'asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+    else:
+        server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+        filepath = str(plate) + '/' + str(mjd) + '/' + 'apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+
+    openfile = fits.open(server+filepath)
+
+    header = openfile[0].header
+
+    RA = header['RA']
+    DEC = header['DEC']
+
+    c = SkyCoord(ra=RA*u.degree , dec = DEC*u.degree, frame='icrs')
+    c = c.galactic
+
+    longg=c.l.wrap_at(180*u.deg).radian
+    latg=c.b.radian
+
+    fig=plt.figure(figsize=(20,10))
+    ax = plt.subplot(111,projection='aitoff')
+    ax.tick_params(axis='y', labelsize=20)
+    ax.tick_params(axis='x',labelsize=16)
+    ax.grid(True)
+
+    #ax.scatter(longg1,latg1,s=2,color='green',alpha=0.1)
+    ax.scatter(longg,latg,s=100,color='red',marker='*',edgecolor='black',linewidth=0.5)
+
+    plt.show()
+    #plt.savefig('/Users/ballanr/Desktop/Aitoff3.png',bbox_inches='tight',dpi=300)

@@ -16,20 +16,15 @@ import pandas as pd
 4581,'2M06525305-1000270'
 
 '''
-loc = '/Users/ballanr/Desktop/SummerResearch/T-Tauri/Modules/Visits.csv'
-loc1 = '/Users/ballanr/Desktop/testtest.csv'
-#g = functions.apVisit_Updated_Catalog(loc)
-g = functions.Brackett_Ratios_Updated(loc1)
+#loc = '/Users/ballanr/Desktop/SummerResearch/T-Tauri/Modules/Visits.csv'
+#loc1 = '/Users/ballanr/Desktop/peakstocompare.csv'
+#g = functions.apVisit_Updated_Catalog(loc,400000)
+#g = functions.Brackett_Ratios_Updated(loc1)
 #g = functions.Confidence_Level('/Users/ballanr/Desktop/File Outputs/100001-200001 Equivs.csv')
 
-'''
-for i in range(6):
-    if i != 6:
-        rangestart = 100000*i
-        rangeend = rangestart + 100000
-        print(rangestart,rangeend)
-    else:
-        rangestart = 500000
-        rangeend = None
-        print(rangestart,rangeend)
-'''
+#functions.DR15_Brackett_Catalog()
+#functions.Directory_Walk()
+#functions.Brackett_Ratios_Updated_Grid(9659,57790,107)
+functions.Aitoff(15)
+#functions.DR14_Brackett_Catalog()
+#functions.testest()

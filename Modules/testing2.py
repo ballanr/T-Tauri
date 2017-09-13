@@ -1,44 +1,14 @@
 import functions
-import matplotlib.pyplot as plt
-from astropy.io import fits
+import pandas as pd
 import numpy as np
-
-fitsfile = '/Users/ballanr/Desktop/SummerResearch/dr13/apogee/spectro/redux/r6/apo25m/6218/56172/apVisit-r6-6218-56172-094.fits'
-openfile = fits.open(fitsfile)
-vbc = openfile[0].header['BC']
-c = 299792.458
-shift = 1 + (vbc/c)
-        
-fspec = openfile[1]
-fwave = openfile[4]
-wave = []
-flux = []
-        
-for i in range(len(fwave.data[2])):
-    wave.append(fwave.data[2][-i-1])
-    flux.append(fspec.data[2][-i-1])
-for i in range(len(fwave.data[1])):
-    wave.append(fwave.data[1][-i-1])
-    flux.append(fspec.data[1][-i-1])
-for i in range(len(fwave.data[0])):
-    wave.append(fwave.data[0][-i-1])
-    flux.append(fspec.data[0][-i-1])
-#plt.plot(wave,flux,linewidth=1,color='red',label='Original Spectra')
+import itertools
+import matplotlib.pyplot as plt
 
 
-y = functions.OH_Skylines_Remover(wave,flux)
-g = functions.Br_EqW(wave,y,11,vbc)
-wave = np.asarray(wave) * shift
-gg = g[3]*(10**10)
-plt.plot(wave,y,linewidth=1,color = 'blue',label='Removed Skylines')
-plt.legend()
-plt.xlim(16770,16850)
-plt.axhline(618.3127,ls = 'dashed',color='black')
-plt.axvline(gg,ls='dashed',color='red')
-#plt.ylim(200,600)
-plt.show()
-'''
-for i in range(10):
-
-    g = functions.Br_EqW(wave,y,11+i,vbc)
-    print(g)'''
+#functions.Brackett_Ratios_Updated(9660,57790,51)
+array1 = [0.89581867,2.184320794,1.470868422,1.084628333,1.429679827,1.770650756,1.830230095,1.816230694,1.809331791,0.871300556]
+array2 = [1.602058412,1.431733516,1.068250918,-0.130423057,0.961602596,-0.580945237,0.966153693,1.37998718,0.364089654,-0.258885349]
+error1 = [0.02911449,0.078649056,0.033477785,0.040671344,0.032590827,0.034332149,0.034271002,0.034455161,0.03485323,0.033989851]
+error2 = [0.06448841,0.12741473,0.076656843,0.082717254,0.089089807,0.088709831,0.095931344,0.101238306,0.095355615,0.093775436]
+x,y = functions.Model_Fitter(array1,error1)
+print(x,y)
