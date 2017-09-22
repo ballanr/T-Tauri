@@ -76,8 +76,11 @@ def apVisit_Catalog_Output(filename,savefile):
             print('Writing row %s' %i)
 
 def find_nearest(array,value):
-    from numpy import abs
-    index = (abs(array-value)).argmin()
+    
+    import numpy as np
+
+    array = np.asarray(array)
+    index = (np.abs(array-value)).argmin()
     return index
 
 def apStar_to_apVisit(locid,twomassid):
@@ -96,162 +99,8 @@ def apStar_to_apVisit(locid,twomassid):
         array.append((int(plate),int(MJD),fiber,int(visits)))
     return array,locid,twomassid
 
-def Br_Equiv_Width_Apogee(plateid,MJD,fiber,emission_line):
-    import numpy as np
-    import apogee.tools.read as apread
-    from astropy.io import fits
-    import functions
 
-    #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
 
-    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
-    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
-
-    #Importing header via astropy--------------------------------------------------------------------------------------------------------------------|
-    filename = functions.File_Path(plateid,MJD,fiber)
-    main_header = fits.open(filename)
-
-    #Barycentric Correction--------------------------------------------------------------------------------------------------------------------------|
-    
-    #vbcstring = 'BC' + str(1) Somehow need to figure out which visit this MJD applies to
-    vbc = main_header[0].header['BC']
-    vhelio = main_header[0].header['VHELIO']
-    observed_wavelength,shift,rest_wavelength = functions.Barycentric_Correction(emission_line,vbc)
-    
-    #Equivalent Width Calculation--------------------------------------------------------------------------------------------------------------------|
-
-    #Finding the centerline and checking that it matches the peak in the window
-    centerline = find_nearest(wave,observed_wavelength) #Finds the closest element of wave for our observed peak
-    centerline_check = Max_Flux_Check(wave,spec,centerline)
-    
-    '''if emission_line == 11:
-        if spec[centerline] != spec[centerline_check[1]]:
-            print('The centerline has changed from ' + str(centerline) + ' to ' + str(centerline_check[1]) + ' with a new flux of ' + str(centerline_check[0]) + 
-            ' from ' + str(spec[centerline]) + '.')
-            centerline = centerline_check[1]'''
-    
-
-    L1 = centerline - 240 # ~ 56 Angstroms
-    L2 = centerline - 150 # ~ 35 Angstroms
-    R1 = centerline + 150
-    R2 = centerline + 240
-
-    Fluxcontinuum = (np.sum(spec[L1:L2])+np.sum(spec[R1:R2])) / (len(spec[L1:L2])+len(spec[R1:R2]))
-    EqW1 = 0
-
-    if Fluxcontinuum == 0:
-
-        EqW1 = 0
-        EqW1_rounded = 0
-
-    if Fluxcontinuum != 0:
-
-        for i in range(L2,centerline):
-
-            left_area = (wave[i+1]-wave[i])*(spec[i+1]-Fluxcontinuum)-(1./2.)*(wave[i+1]-wave[i])*(spec[i+1]-spec[i])
-            EqW1 += left_area
-
-        for i in range(centerline,R1):
-
-            right_area = (wave[i+1]-wave[i])*(spec[i]-Fluxcontinuum)-(1./2.)*(wave[i+1]-wave[i])*(spec[i]-spec[i+1])
-            EqW1 += right_area
-
-        EqW_rounded = round(EqW1/Fluxcontinuum,5)
-        EqW = EqW1/Fluxcontinuum
-    
-    return EqW,EqW_rounded,vbc,vhelio,Fluxcontinuum,centerline,shift
- 
-def Br_Equiv_Width_Plotter(plateid,MJD,fiber,emission_line):
-    import numpy as np
-    import apogee.tools.read as apread
-    import matplotlib.pyplot as plt
-    import functions
-
-    #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
-
-    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
-    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
-
-    #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
-    EqW,EqW_rounded,vbc,vhelio,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
-
-    #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
-    title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
-    fig,ax = plt.subplots(figsize=(16,8))
-    plt.plot(wave+shift,spec,linewidth=2.5,label='Shifted')
-    
-    plt.axhline(y=Fluxcontinuum,ls='dashed',color='black')
-    plt.axvline(x=wave[centerline]+shift,ls='dashed',color='r',label='Rest Emission')
-    
-    plt.legend(loc=1,prop={'size':18})
-    plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
-    plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
-    plt.suptitle(title,fontsize = 20)
-    plt.xlim(wave[centerline]-40,wave[centerline]+40)
-    plt.ylim(Fluxcontinuum-(1/2)*(spec[centerline]-Fluxcontinuum),Fluxcontinuum+2*(spec[centerline]-Fluxcontinuum))
-    ax.tick_params(axis='both', labelsize=20)   
-    #plt.show()
-def Unshifted_Plotter(plateid,MJD,fiber,emission_line):
-    import numpy as np
-    import apogee.tools.read as apread
-    import matplotlib.pyplot as plt
-    import functions
-
-    #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
-
-    spec = apread.apVisit(plateid,MJD,fiber,ext=1,header=False)
-    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
-
-    #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
-    EqW,EqW_rounded,vbc,vhelio,Fluxcontinuum,centerline,shift = functions.Br_Equiv_Width(plateid,MJD,fiber,emission_line)
-
-    #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
-    title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
-    fig,ax = plt.subplots(figsize=(16,8))
-    plt.plot(wave,spec,linewidth=2.5,label='Not Shifted')
-    
-    plt.axhline(y=Fluxcontinuum,ls='dashed',color='black')
-    plt.axvline(x=wave[centerline]+shift,ls='dashed',color='r',label='Rest Emission')
-    
-    plt.legend(loc=1,prop={'size':18})
-    plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
-    plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
-    plt.suptitle(title,fontsize = 20)
-    plt.xlim(wave[centerline]-40,wave[centerline]+40)
-    plt.ylim(Fluxcontinuum-(1/2)*(spec[centerline]-Fluxcontinuum),Fluxcontinuum+2*(spec[centerline]-Fluxcontinuum))
-    ax.tick_params(axis='both', labelsize=20)   
-    #plt.show()
-def Skyline_Plotter(plateid,MJD,fiber,emission_line):
-    import numpy as np
-    import apogee.tools.read as apread
-    from astropy.io import fits
-    import matplotlib.pyplot as plt
-    import functions
-
-    #Importing spectrum via apogee-------------------------------------------------------------------------------------------------------------------|
-    
-    spec = apread.apVisit(plateid,MJD,fiber,ext=5,header=False)
-    wave = apread.apVisit(plateid,MJD,fiber,ext=4,header=False)
-
-    #Values for plotter needed-----------------------------------------------------------------------------------------------------------------------|
-    equivs,Fluxcontinuum,shift,rest_wavelength,centerline = functions.Br_EqW(wave,spec,emission_line,vbc)
-
-    #Plot averaged spectrum with EqW-----------------------------------------------------------------------------------------------------------------|
-    title = str(plateid)+'-'+str(MJD)+'-'+str(fiber)+'-'+str(emission_line)
-    fig,ax = plt.subplots(figsize=(16,8))
-    plt.plot(wave,spec,linewidth=2.5,label='Shifted')
-    
-    plt.axhline(y=Fluxcontinuum,ls='dashed',color='black')
-    plt.axvline(x=wave[centerline]+shift,ls='dashed',color='r',label='Rest Emission')
-    
-    
-    plt.xlabel('Wavelength'+' '+'('+ r'$\AA$'+')', fontsize=24)
-    plt.ylabel('Flux (erg s' + r'$^{-1}$'+' cm'+r'$^{-2}$' + r'$\AA^{-1}$'+')', fontsize=24)
-    plt.suptitle(title,fontsize = 20)
-    plt.xlim(wave[centerline]-40,wave[centerline]+40)
-    plt.ylim(0,3*Fluxcontinuum)
-    ax.tick_params(axis='both', labelsize=20)   
-    #plt.show()
 
 def Barycentric_Correction(emission_line,vbc):
 
@@ -338,312 +187,7 @@ def Brackett_Ratios(plateid,mjd,fiber):
     plt.show()
     
 
-def File_Path(plateid,mjd,fiber):
 
-    import os
-
-    #Creating file path------------------------------------------------------------------------------------------------------------------------------|
-    '''
-    Notes:
-        - Need to rework this to include Location ID from master list
-    '''
-    server = '/Volumes/CoveyData/APOGEE_Spectra/python_DR13/dr13/apogee/spectro/redux/r6/apo25m/'
-    #server = '/Users/ballanr/Desktop/SummerResearch/dr13/apogee/spectro/redux/r6/apo25m/'
-    plate = str(plateid)
-    MJD = str(mjd)
-    fiber_num = str(fiber)
-    therest = 'apVisit-r6-'
-    dashes = '-'
-    f = '.fits'
-
-    endname = therest + plate + dashes + MJD + dashes + fiber_num + f
-    filename = os.path.join(server,plate,MJD,endname)
-
-    return filename
-    
-def Balmer_Decrement_Plot():
-
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-    #Importing Decrement File------------------------------------------------------------------------------------------------------------------------|
-    data = np.loadtxt('/Users/ballanr/Desktop/Fwd__Bracket_Decrement/x74.txt',delimiter = '\t',unpack=True)
-    print(data[0])
-    T = [3750,5000,7500,8750,10000,12500,15000]
-    for i in range(len(T)):
-        plt.plot(np.linspace(8,12.4,num=23),data[i],label = str(T[i]) + ' K')
-        plt.scatter(np.linspace(8,12.4,num=23),data[i])
-    plt.xticks(np.arange(8,12.6,0.2))
-    for k in range(5):
-        x = 8 + k
-        plt.axvline(x,ls = 'dashed',linewidth = 0.5,color = 'black')
-        g = 0.1 + (0.1*k)
-        plt.axhline(g,ls = 'dashed', linewidth = 0.5, color = 'black')
-    plt.xlabel('Log $n_e$')
-    plt.ylabel('Transition Probabilities')
-    plt.legend()
-    plt.show()
-    
-def Probs_Calc(n,T):
-
-    import numpy as np
-
-    #Constants------------------------------------------------------------------------------------------------------------------------|
-    k = 8.6173303*(10**(-5)) #eV/K
-   
-    #Calculations---------------------------------------------------------------------------------------------------------------------|
-    n_i = 4**2
-    n_k = n**2
-    E_1 = -13.6/n_i
-    E_2 = -13.6/n_k
-    exponent = -(E_2 - E_1)/(k*T)
-    boltz = 2*(n_k/n_i)*np.exp(exponent)
-
-    return boltz
-
-def Probs_Plots():
-    import numpy as np
-    import functions
-    import matplotlib.pyplot as plt
-    
-    T = [3750,5000,7500,8750,10000,12500,15000]
-    for j in range(len(T)):
-        xx = []
-        yy = []
-        for i in range(20):
-            x = 1 + i
-            y = functions.Probs_Calc(x,T[j])
-            y = np.log(y)
-            #plt.scatter(x,y)
-            xx.append(x)
-            yy.append(y)
-        plt.plot(xx,yy,label = str(T[j]) + ' K')
-        plt.scatter(xx,yy)
-        plt.xlabel('N')
-        plt.ylabel('Probability')
-    plt.legend(bbox_to_anchor=(1.25,1))
-    #plt.xlim(2,20)
-    plt.xticks(np.arange(2,21,1))
-    #plt.ylim(-2.75,1)
-    plt.show()
-
-def Saha(n,T,density):
-
-    '''
-    This isn't really useful right now...this looks at the ionization states,
-    not the transition probabilities...
-    '''
-
-    import numpy as np
-
-    k_J = 1.380648*(10**(-23)) #Joules
-    k_e = 8.617*(10**(-5)) # eVs
-    
-    n_i = n**2
-    n_k = (n+1)**2
-    n_e = density
-    h = 6.626*(10**(-34))
-    m_e = 9.109*(10**(-31))
-    E_1 = -13.6/n_i
-    E_2 = -13.6/n_k
-    E = E_2 - E_1
-
-    part1 = (1/n_e)
-    #print(part1)
-    part2 = (2*(n_k/n_i))
-    part2 = 1
-    #print(part2)
-    part3 = (((2*np.pi*m_e*k_J*T)/(h**2))**(3/2))
-    #print(part3)
-    part4 = (np.exp(E_1/(k_e*T)))
-    #print(part4)
-    
-    #A = np.log(part1*part2*part3*part4)
-    A = part1*part2*part3*part4
-    
-    return A
-    
-    
-def Boltzmann(n_upper,n_lower,T):
-    
-    import numpy as np
-
-    k_e = 8.617*(10**(-5)) # eVs
-    
-
-    g_b = 2*(n_upper**2)
-    g_a = 2*((n_lower)**2)
-    del_E = -3.4+13.6
-    E_b = -13.6/(n_upper**2)
-    E_a = -13.6/(n_lower**2)
-
-    B = (g_b / g_a)*np.exp(-(E_b - E_a)/(k_e * T))
-
-    return B
-
-def Saha_Boltzmann(n_upper,n_lower,ion,T,density):
-    
-    import functions
-    import numpy as np
-
-    x = functions.Saha(ion,T,density)
-    y = functions.Boltzmann(n_upper,n_lower,T)
-    
-    SB = (y/(1+y))*(1/(1+x))
-
-    return np.log(SB)
-
-def SB_Plotter():
-
-    import functions
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    T = [3750,5000,7500,8750,10000,12500,15000]
-    gg = [11,12,13,14,15,16,17,18,19,20]
-    densities = []
-    for i in range(23):
-        y = 8 + (0.2*i)
-        x = (100**3)*(np.exp(y))
-        densities.append(x)
-    #Plotter 1
-    '''
-    yy = []
-    for i in range(len(T)):
-        y = np.log(functions.Saha_Boltzmann(11,4,1,T[i]))
-        yy.append(y)
-    plt.plot(T,yy)
-    plt.scatter(T,yy)
-    '''
-    #Plotter 2
-
-    for i in range(len(T)):
-        
-        for j in range(len(densities)):
-            yy = []
-            for k in range(len(gg)):
-                y = functions.Saha_Boltzmann(gg[k],4,1,T[i],densities[j])
-                yy.append(y)
-            plt.plot(gg,yy,label='Temp ' + str(T[i])+'density '+str(densities[j]))
-            plt.scatter(gg,yy)
-    plt.legend(bbox_to_anchor=(1,1))
-    plt.show()
-
-def SB_CSV(savefile):
-
-    import csv
-    import functions
-    import numpy as np
-    import matplotlib.pyplot as plt
-    
-    with open(savefile,'w') as savefile:
-
-        densities = []
-        for i in range(23):
-            y = 8 + (0.2*i)
-            x = (100**3)*(np.exp(y))
-            densities.append(x)
-        
-        T = [3750,5000,7500,8750,10000,12500,15000]
-        brackett = [11,12,13,14,15,16,17,18,19,20]
-
-        names = ['Densities','3750','5000','7500','8750','10000','12500','15000']
-        writer = csv.DictWriter(savefile,delimiter = '\t',fieldnames = names)
-        writer.writeheader()
-        b=[]
-        for i in range(len(densities)):
-            a = []
-            for k in range(len(T)):
-                y = functions.Saha_Boltzmann(11,4,1,T[k],densities[i])
-                a.append(y)
-            #writer.writerow({'Densities':densities[i],'3750':a[0],'5000':a[1],'7500':a[2],'8750':a[3],'10000':a[4],'12500':a[5],'15000':a[6]})
-            b.append(a)
-        for i in range(len(b)):
-            for k in range(7):
-                b[i][k] = b[i][k]/b[12][3]
-        for i in range(len(densities)):
-            writer.writerow({'Densities':densities[i],'3750':b[i][0],'5000':b[i][1],'7500':b[i][2],'8750':b[i][3],'10000':b[i][4],'12500':b[i][5],'15000':b[i][6]})
-
-        for i in range(23):
-            plt.plot(T,b[i])
-            plt.scatter(T,b[i])
-        plt.legend(bbox_to_anchor=(1,1))
-        plt.show()
-
-
-
-def twomass_uniqueness(filename,savefile):
-    import csv
-    import functions
-    import math
-
-    uniques = [[str(4614),'2M05412754-0646074']] #Setting up array to check for unique 2M IDs
-    nonuniques = [] #The array for storing non-unqiue 2M IDs
-    
-    g = 1
-    gg = 579468
-
-    with open(filename) as csvfile:
-
-        reader = csv.reader(csvfile,delimiter='\t') 
-        next(reader, None)  # skip the headers
-        for row in reader:
-            locid = row[0]
-            twomassid = row[1]
-            x = functions.Uniqueness_Filter(uniques, locid, twomassid) #Checks the location ID and 2M ID against the growing list of uniques
-            
-            if x == 1:
-                uniques.append((row[0],row[1]))
-                #print('Unique visit %s' %g)
-                g += 1
-
-            elif x == 0:
-                uniques.append((row[0],row[1]))
-                nonuniques.append((row[0],row[1]))
-                #print('Non-unique visit %s' %g)
-                g += 1
-            
-            percent = (g/gg)*100
-            numbertimes = math.floor(percent)
-
-            hashes = '#' * int(numbertimes)
-            
-            spaces = ' '* (100 - int(numbertimes))
-
-            print('Sorting through files: %.5f done ['%percent + hashes + str(spaces) + ']',end='\r',flush = True)
-
-    with open(savefile,'w') as savefile:
-        
-        writer = csv.writer(savefile,delimiter = '\t')
-        
-        writer.writerow(('Location ID','2Mass ID'))
-        
-        for i in range(len(nonuniques)):
-            if i != 0:
-                percent = (i/len(nonuniques))*100
-                numbertimes = math.floor(percent)
-                hashes = '#' * int(numbertimes)
-                spaces = ' '* (100 - int(numbertimes))
-
-                writer.writerow((nonuniques[i][1],nonuniques[i][0]))
-
-                print('Writing rows: %.5f done ['%percent + hashes + str(spaces) + ']',end='\r',flush = True)
-    
-    return uniques,nonuniques
-
-def Uniqueness_Filter(array, locid, twomassid):
-    
-    state = 0
-    
-    for a,b in array:
-
-        if a != locid and b != twomassid:
-            state = 1
-        
-        elif a != locid and b == twomassid:
-            state = 0
-    
-    return state
 
 
 
@@ -1017,6 +561,9 @@ def DR13_Brackett_Catalog():
     probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR13/Section 6 Problems.csv',index=False)
 def DR14_Brackett_Catalog():
 
+    #Some of the .fits files in the DR14 folders have NaN values in them and break the loop. Need to
+    #find them and fix them before a catalog can be run
+
     import functions
     import pandas as pd
     from astropy.io import fits as fits
@@ -1172,7 +719,7 @@ def DR15_Brackett_Catalog():
     import itertools
     from PyAstronomy.pyasl import helcorr as helcorr
 
-    dr15table = pd.read_csv('/Users/ballanr/Desktop/File Outputs/DR15/forMdot_analysis.csv')
+    dr15table = pd.read_csv('/Users/ballanr/Desktop/File Outputs/DR15/appended list.csv')
     problems = []
     cols = ['Location ID','2Mass ID', 'Plate ID','MJD','Fiber','S/R','Model Density','Model Temp','Overall Confidence',
             'Br11 Error','Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error',
@@ -1187,20 +734,22 @@ def DR15_Brackett_Catalog():
     for index,row in itertools.islice(dr15table.iterrows(),rowstart,None):
         try:
             g+=1
-            loc = row['LOCID']
-            twomass = row['2MASS_ID']
+            #loc = row['LOCID']
+            #twomass = row['2MASS_ID']
             print(str(g))
-            plateid = row['PLATE']
+            plateid = row['Plate']
             mjd = row['MJD']
-            snr = row['S/N']
-            if len(str(row['FIB'])) == 3:
-                fiber = str(row['FIB'])
-            elif len(str(row['FIB'])) == 2:
-                fiber = '0' + str(row['FIB']) 
+            #snr = row['S/N']
+            if len(str(row['Fiber'])) == 3:
+                fiber = str(row['Fiber'])
+            elif len(str(row['Fiber'])) == 2:
+                fiber = '0' + str(row['Fiber']) 
             else:
-                fiber = '00' + str(row['FIB'])
+                fiber = '00' + str(row['Fiber'])
 
-            fitsfile = row['path-to-file-on-CoveyData']
+            server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+            filepath = row['filepath']
+            fitsfile = server + str(plateid) + '/' + str(mjd) + '/' + str(filepath)
 
             #this passes a filepath that astropy can open with fits, circumventing apogee entirely...
             
@@ -1208,19 +757,32 @@ def DR15_Brackett_Catalog():
 
             header = openfile[0].header
 
+            loc = header['LOCID']
+            twomass = header['OBJID']
+            try:
+                snr = header['SNR']
+            except:
+                snr = 0
+                print('Row '+str(g)+' has no SNR value...')
+                problems.append((loc,twomass,plateid,mjd,fiber,'NaN'))
+            
             ra = header['RA']
             dec = header['DEC'] 
             jd = header['JD-MID']
-            telescope = header['TELESCOP']
+            #telescope = header['TELESCOP']
             
-            if telescope == 'apo25m':
+            height = 2788
+            longg = -105.4913
+            lat = 36.4649
+
+            '''if telescope == 'apo25m':
                 height = 2788
                 longg = -105.4913
                 lat = 36.4649
             else:
                 height = 2380
                 longg = -70.413336
-                lat = -29.05256
+                lat = -29.05256'''
 
             vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
 
@@ -1277,22 +839,24 @@ def DR15_Brackett_Catalog():
             
             if equiv_check > 0:
                 
-                modeldens,modeltemp = functions.Model_Fitter(EqW,equivs_error)
+                Confidence = functions.Confidence_Level(wave,newflux,restwaves[0])
+            
+                if Confidence > 1.25:
 
-                Confidence = functions.Confidence_Level(wave,flux,restwaves[0])
+                    modeldens,modeltemp = functions.Model_Fitter(EqW,equivs_error)
 
-                data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,Confidence,equivs_error[0],equivs_error[1],
-                        equivs_error[2],equivs_error[3],equivs_error[4],equivs_error[5],equivs_error[6],equivs_error[7],
-                        equivs_error[8],equivs_error[9],EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
+                    data = [int(loc),twomass,int(plateid),int(mjd),fiber,snr,modeldens,modeltemp,Confidence,equivs_error[0],equivs_error[1],
+                            equivs_error[2],equivs_error[3],equivs_error[4],equivs_error[5],equivs_error[6],equivs_error[7],
+                            equivs_error[8],equivs_error[9],EqW[0],EqW[1],EqW[2],EqW[3],EqW[4],EqW[5],EqW[6],EqW[7],EqW[8],EqW[9]]
 
-                df.loc[len(df)+1] = data
+                    df.loc[len(df)+1] = data
 
-                '''df1 = pd.DataFrame(wave,columns=['Wavelength'])
-                df1['Flux'] = newflux
-                df1['Error'] = error
-                filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
-                df1.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'+filename,index=False)
-                df1 = df1.iloc[0:0]'''                        
+                    df1 = pd.DataFrame(wave,columns=['Wavelength'])
+                    df1['Flux'] = newflux
+                    df1['Error'] = error
+                    filename = str(plateid) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+                    df1.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'+filename,index=False)
+                    df1 = df1.iloc[0:0]                        
 
         except KeyError:
             print('Row '+str(g)+' has no BC value...')
@@ -1306,11 +870,11 @@ def DR15_Brackett_Catalog():
             print('Index '+str(g)+' broke...')
             problems.append((loc,twomass,plateid,mjd,fiber,'IndexError')) 
 
-    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 changing continuum.csv',index=False)
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/blah.csv',index=False)
     df = df.iloc[0:0]
 
     probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
-    #probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Problems.csv',index=False)
+    probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/blah Problems.csv',index=False)
 
 def Br_Error(wave,flux,err,line,rest):
     
@@ -1515,29 +1079,26 @@ def Model_Fitter(eqwarray,error):
 
     return dens,temp
 
-def Brackett_Ratios_Updated_Grid(plate,mjd,fiber):
+def Brackett_Ratios_Updated_Grid():
 
+    import matplotlib as mpl
     import pandas as pd
     import matplotlib.pyplot as plt
     import numpy as np
     import itertools
     import seaborn as sb
     
-    #import matplotlib as mpl
-    #mpl.rcParams.update(mpl.rcParamsDefault)
+    filepath = '/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Cutoff.csv'
+    filefile = pd.read_csv(filepath)
 
-    #finding the equivalent widths and errors for a given visit
-    filefile = pd.read_csv('/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Cutoff.csv')
+    
+    mpl.rcParams.update(mpl.rcParamsDefault)
 
-    if len(str(fiber)) == 3:
-        Fiber = str(fiber)
-    elif len(str(fiber)) == 2:
-        Fiber = '0' + str(fiber) 
-    else:
-        Fiber = '00' + str(fiber)
-    equivs = []
-    errors = []
     for index,row in itertools.islice(filefile.iterrows(),0,None):
+        
+        equivs = []
+        errors = []
+
         plateid = int(row['Plate ID'])
         MJD = int(row['MJD'])
         modeldens = str(row['Model Density'])
@@ -1551,69 +1112,69 @@ def Brackett_Ratios_Updated_Grid(plate,mjd,fiber):
         else:
             ffiber = '00' + str(ffiber)
 
-        if plateid == plate and MJD == mjd and ffiber == Fiber:
+        for j in range(10):
+            number = 11+j
+            errorstring = 'Br' + str(number) + ' Error'
+            equivstring = 'Br' + str(number) + ' EqW'
+            hh = row[errorstring]
+            gg = row[equivstring]
+            equivs.append(gg)
+            errors.append(hh)
 
-            for j in range(10):
-                number = 11+j
-                errorstring = 'Br' + str(number) + ' Error'
-                equivstring = 'Br' + str(number) + ' EqW'
-                hh = row[errorstring]
-                gg = row[equivstring]
-                equivs.append(gg)
-                errors.append(hh)
+        savestring = str(plateid) + '-' + str(MJD) + '-' + str(ffiber) + '.pdf'
 
+        equivs = np.asarray(equivs)
+        errors = np.asarray(errors)
+        equivs1 = equivs/equivs[0]
 
-            equivs = np.asarray(equivs)
-            errors = np.asarray(errors)
-            equivs1 = equivs/equivs[0]
+        summederrors = []
 
-            summederrors = []
+        for i in range(10):
 
-            for i in range(10):
+            dq = equivs1[i] * np.sqrt( (errors[i]/equivs[i])**2 + (errors[0]/equivs[0])**2 )
+            summederrors.append(dq)
 
-                dq = equivs1[i] * np.sqrt( (errors[i]/equivs[i])**2 + (errors[0]/equivs[0])**2 )
-                summederrors.append(dq)
-                #print(dq)
+        temps = ['3750 K','5000 K','7500 K','8750 K','10000 K','12500 K','15000 K']
 
-            temps = ['3750 K','5000 K','7500 K','8750 K','10000 K','12500 K','15000 K']
+        d8T3750 = np.asarray([0.05071,0.04067,0.03307,0.02709,0.02237,0.01835,0.01527,0.01281,0.01081,0.009207])
+        d8T8750 = np.asarray([0.04492,0.03533,0.02837,0.02307,0.019,0.01573,0.01313,0.01105,0.009374,0.00801])
+        d8T15000 = np.asarray([0.02642,0.02042,0.01618,0.01303,0.01067,0.008821,0.007353,0.006188,0.005252,0.004492])
+        d10T3750 = np.asarray([0.03951,0.03036,0.02369,0.01874,0.01503,0.01222,0.01006,0.008374,0.007042,0.005979])
+        d10T8750 = np.asarray([0.02256,0.01705,0.01321,0.01044,0.008401,0.006864,0.005682,0.00476,0.004027,0.003437])
+        d10T15000 = np.asarray([0.01032,0.00755,0.00576,0.004524,0.003634,0.00297,0.002463,0.002068,0.001753,0.001499])
+        d12T3750 = np.asarray([0.2249,0.1888,0.1567,0.1297,0.1077,0.09002,0.07573,0.06418,0.05477,0.04704])
+        d12T8750 = np.asarray([0.9622,1.027,1.079,1.12,1.149,1.162,1.159,1.139,1.104,1.058])
+        d12T15000 = np.asarray([1.082,1.167,1.23,1.267,1.274,1.253,1.208,1.147,1.076,0.9992])
 
-            d8T3750 = np.asarray([0.05071,0.04067,0.03307,0.02709,0.02237,0.01835,0.01527,0.01281,0.01081,0.009207])
-            d8T8750 = np.asarray([0.04492,0.03533,0.02837,0.02307,0.019,0.01573,0.01313,0.01105,0.009374,0.00801])
-            d8T15000 = np.asarray([0.02642,0.02042,0.01618,0.01303,0.01067,0.008821,0.007353,0.006188,0.005252,0.004492])
-            d10T3750 = np.asarray([0.03951,0.03036,0.02369,0.01874,0.01503,0.01222,0.01006,0.008374,0.007042,0.005979])
-            d10T8750 = np.asarray([0.02256,0.01705,0.01321,0.01044,0.008401,0.006864,0.005682,0.00476,0.004027,0.003437])
-            d10T15000 = np.asarray([0.01032,0.00755,0.00576,0.004524,0.003634,0.00297,0.002463,0.002068,0.001753,0.001499])
-            d12T3750 = np.asarray([0.2249,0.1888,0.1567,0.1297,0.1077,0.09002,0.07573,0.06418,0.05477,0.04704])
-            d12T8750 = np.asarray([0.9622,1.027,1.079,1.12,1.149,1.162,1.159,1.139,1.104,1.058])
-            d12T15000 = np.asarray([1.082,1.167,1.23,1.267,1.274,1.253,1.208,1.147,1.076,0.9992])
+        filename = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Density Files/Density ' + modeldens + ' Ratios.csv'
+        openfile = pd.read_csv(filename)
 
-            filename = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Density Files/Density ' + modeldens + ' Ratios.csv'
-            openfile = pd.read_csv(filename)
+        y = openfile[modelt+ ' K']
+        y = np.asarray(y)
+        y = y/y[0]
 
-            y = openfile[modelt+ ' K']
-            y = np.asarray(y)
-            y = y/y[0]
+        plt.figure(figsize=(20,10))
+        plt.title(str(plateid)+'-'+str(MJD)+'-'+ffiber,fontsize=24)
+        plt.xticks((np.arange(11,21,1)))
+        plt.plot(np.arange(11,21,1),y,color=sb.xkcd_rgb['black'],label='Best Fit, Density: '+str(modeldens)+' Temp: '+str(modelt))
+        plt.scatter(np.arange(11,21,1),y,color=sb.xkcd_rgb['black'])
+        plt.errorbar(np.arange(11,21,1),equivs1,yerr=summederrors,ecolor='red',barsabove=True,
+                    capsize=3,fmt='-o',color=sb.xkcd_rgb['blue'],label='Br Emission')
 
-            plt.figure(figsize=(20,10))
-            plt.title(str(plateid)+'-'+str(MJD)+'-'+ffiber,fontsize=24)
-            plt.xticks((np.arange(11,21,1)))
-            plt.plot(np.arange(11,21,1),y,color=sb.xkcd_rgb['black'],label='Best Fit, Density: '+str(modeldens)+' Temp: '+str(modelt))
-            plt.scatter(np.arange(11,21,1),y,color=sb.xkcd_rgb['black'])
-            plt.errorbar(np.arange(11,21,1),equivs1,yerr=summederrors,ecolor='red',fmt='-o',color=sb.xkcd_rgb['blue'],label='Br Emission')
-
-            plt.plot(np.arange(11,21,1),d8T3750/d8T3750[0],color=sb.xkcd_rgb['red'],ls='dashed',label='Density: 8 Temp: 3750')
-            plt.plot(np.arange(11,21,1),d8T8750/d8T8750[0],color=sb.xkcd_rgb['red'],ls='dashdot',label='Density: 8 Temp: 8750')
-            plt.plot(np.arange(11,21,1),d8T15000/d8T15000[0],color=sb.xkcd_rgb['red'],ls='solid',label='Density: 8 Temp: 15000')
-            plt.plot(np.arange(11,21,1),d10T3750/d10T3750[0],color=sb.xkcd_rgb['forest green'],ls='dashed',label='Density: 10 Temp: 3750')
-            plt.plot(np.arange(11,21,1),d10T8750/d10T8750[0],color=sb.xkcd_rgb['forest green'],ls='dashdot',label='Density: 10 Temp: 8750')
-            plt.plot(np.arange(11,21,1),d10T15000/d10T15000[0],color=sb.xkcd_rgb['forest green'],ls='solid',label='Density: 10 Temp: 15000')
-            plt.plot(np.arange(11,21,1),d12T3750/d12T3750[0],color=sb.xkcd_rgb['purple'],ls='dashed',label='Density: 12 Temp: 3750')
-            plt.plot(np.arange(11,21,1),d12T8750/d12T8750[0],color=sb.xkcd_rgb['purple'],ls='dashdot',label='Density: 12 Temp: 8750')
-            plt.plot(np.arange(11,21,1),d12T15000/d12T15000[0],color=sb.xkcd_rgb['purple'],ls='solid',label='Density: 12 Temp: 15000')
-            plt.grid(True)
-            plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), shadow=True, ncol=4,frameon=True,facecolor=None,framealpha=1,fontsize=16)
-            plt.savefig('/Users/ballanr/Desktop/'+str(plate) +'-' +str(mjd) +'-'+str(fiber) + '.pdf',bbox_inches='tight',dpi=300)
-            #plt.show()
+        plt.plot(np.arange(11,21,1),d8T3750/d8T3750[0],color=sb.xkcd_rgb['red'],ls='dashed',label='Density: 8 Temp: 3750')
+        plt.plot(np.arange(11,21,1),d8T8750/d8T8750[0],color=sb.xkcd_rgb['red'],ls='dashdot',label='Density: 8 Temp: 8750')
+        plt.plot(np.arange(11,21,1),d8T15000/d8T15000[0],color=sb.xkcd_rgb['red'],ls='solid',label='Density: 8 Temp: 15000')
+        plt.plot(np.arange(11,21,1),d10T3750/d10T3750[0],color=sb.xkcd_rgb['forest green'],ls='dashed',label='Density: 10 Temp: 3750')
+        plt.plot(np.arange(11,21,1),d10T8750/d10T8750[0],color=sb.xkcd_rgb['forest green'],ls='dashdot',label='Density: 10 Temp: 8750')
+        plt.plot(np.arange(11,21,1),d10T15000/d10T15000[0],color=sb.xkcd_rgb['forest green'],ls='solid',label='Density: 10 Temp: 15000')
+        plt.plot(np.arange(11,21,1),d12T3750/d12T3750[0],color=sb.xkcd_rgb['purple'],ls='dashed',label='Density: 12 Temp: 3750')
+        plt.plot(np.arange(11,21,1),d12T8750/d12T8750[0],color=sb.xkcd_rgb['purple'],ls='dashdot',label='Density: 12 Temp: 8750')
+        plt.plot(np.arange(11,21,1),d12T15000/d12T15000[0],color=sb.xkcd_rgb['purple'],ls='solid',label='Density: 12 Temp: 15000')
+        plt.grid(True)
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), shadow=True, ncol=4,frameon=True,facecolor=None,framealpha=1,fontsize=16)
+        plt.savefig('/Users/ballanr/Desktop/File Outputs/DR15/DR15 Brackett Decrement Plots/' + savestring,bbox_inches='tight',dpi=300)
+        plt.clf()
+        plt.close()
 
 def Aitoff(dr):
     from astropy.coordinates import SkyCoord  # High-level coordinates
@@ -1889,51 +1450,613 @@ def Aitoff(dr):
     #plt.show()
     plt.savefig('/Users/ballanr/Desktop/Aitoff3.png',bbox_inches='tight',dpi=300)
 
-def testest():
+def Protostar_Spectra_Plotter():
 
-    from astropy.coordinates import SkyCoord  # High-level coordinates
-    from astropy.coordinates import ICRS, Galactic, FK4, FK5  # Low-level frames
-    from astropy.coordinates import Angle, Latitude, Longitude  # Angles
-    import astropy.units as u
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import itertools
+
+    filepath = '/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Cutoff.csv'
+    openfile = pd.read_csv(filepath)
+
+    for index,row in itertools.islice(openfile.iterrows(),0,None): 
+
+        plateid = int(row['Plate ID'])
+        MJD = int(row['MJD'])
+        fiber = str(row['Fiber'])
+        
+        if len(str(fiber)) == 3:
+            fiber = str(fiber)
+        elif len(str(fiber)) == 2:
+            fiber = '0' + str(fiber) 
+        else:
+            fiber = '00' + str(fiber)
+        
+        folder = '/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'
+        wavefile = folder + str(plateid) + '-' + str(MJD) + '-' + str(fiber) + '.csv'
+        tempfile = pd.read_csv(wavefile)
+
+        wave = tempfile['Wavelength']
+        flux = tempfile['Flux']
+        error = tempfile['Error']
+
+        maxflux = max(flux) + 100
+        minflux = min(flux) - 100
+
+        plt.figure(figsize=(20,10))
+        plt.title(str(plateid)+ '-' + str(MJD) + '-' + str(fiber),fontsize=20)
+        plt.xlabel('Wavelength',fontsize=16)
+        plt.ylabel('Flux',fontsize=16)
+        plt.errorbar(wave,flux,yerr=error,ecolor='red')
+        plt.ylim(minflux,maxflux)
+        
+        savestring = str(plateid)+ '-' + str(MJD) + '-' + str(fiber) + '.png'
+
+        plt.savefig('/Users/ballanr/Desktop/File Outputs/DR15/Plots/Spectra/'+savestring,bbox_inches='tight',dpi=300)
+
+        plt.clf()
+        plt.close()
+
+def Single_Spectra_Plotter(plateid,MJD,fiber,L,R,B,T):
+
+        import pandas as pd
+        import matplotlib.pyplot as plt
+
+
+        folder = '/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'
+        wavefile = folder + str(plateid) + '-' + str(MJD) + '-' + str(fiber) + '.csv'
+        tempfile = pd.read_csv(wavefile)
+
+        wave = tempfile['Wavelength']
+        flux = tempfile['Flux']
+        error = tempfile['Error']
+
+        maxflux = max(flux) + 100
+        minflux = min(flux) - 100
+
+        plt.figure(figsize=(20,10))
+        plt.title(str(plateid)+ '-' + str(MJD) + '-' + str(fiber),fontsize=20)
+        plt.xlabel('Wavelength',fontsize=16)
+        plt.ylabel('Flux',fontsize=16)
+        plt.errorbar(wave,flux,yerr=error,ecolor='red')
+        plt.ylim(B,T)
+        #plt.xlim(L,R)
+
+        plt.show()
+        #plt.savefig('/Users/ballanr/Desktop/Weird Line.png',bbox_inches='tight',dpi=300)
+
+def DR15_Uniques():
+    import functions
+    import matplotlib.pyplot as plt
+    import apogee.tools.read as apread
+    from astropy.io import fits
     import pandas as pd
     import numpy as np
     import itertools
-    from astropy.io import fits
+    from PyAstronomy.pyasl import helcorr as helcorr
+
+    cols = ['Location ID','2Mass ID','Plate','MJD','Fiber','RA','DEC','SNR','Density','Temp','Confidence','Br11 EqW','Br11 EqW Error']
+    df = pd.DataFrame(columns = cols)
+
+    filepath = '/Users/ballanr/Desktop/File Outputs/DR15/Full Uniques.csv'
+    openfile = pd.read_csv(filepath)
+
+    g=0
+
+    for index,row in itertools.islice(openfile.iterrows(),0,None):
+
+            g+=1
+            print(g)
+            loc = int(row['Location ID'])
+            twomass = row['2Mass ID']
+            plate = int(row['Plate'])
+            mjd = int(row['MJD'])
+            fiber = int(row['Fiber'])
+
+            if len(str(fiber)) == 1:
+                fiber = '00' + str(fiber) 
+            if len(str(fiber)) == 2:
+                fiber = '0' + str(fiber)
+            if len(str(fiber)) == 3:
+                fiber = str(fiber)
+            
+            
+            if int(plate) < 8870 :
+
+                fitspath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'+str(plate)+'/'+str(mjd)+'/apVisit-r8-'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.fits'
+            
+            elif int(plate) > 8870 and int(plate) < 9700:
+
+                fitspath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'+str(plate)+'/'+str(mjd)+'/apVisit-apogee2-'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.fits'
+            
+            else:
+                fitspath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'+str(plate)+'/'+str(mjd)+'/asVisit-apogee2-'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.fits'
+                
+            fitsvisit = fits.open(fitspath)    
+                
+            header = fitsvisit[0].header
+
+            snr = header['SNR']
+            ra = header['RA']
+            dec = header['DEC']
+            jd = header['JD-MID']
+            telescope = header['TELESCOP']
+                
+            if telescope == 'apo25m':
+                height = 2788
+                longg = -105.4913
+                lat = 36.4649
+            else:
+                height = 2380
+                longg = -70.413336
+                lat = -29.05256
+
+            vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+
+            c = 299792.458
+            lamshift = 1 + (vbc/c)
+                
+            fspec = fitsvisit[1]
+            ferr = fitsvisit[2]
+            fwave = fitsvisit[4]
+            wave = []
+            flux = []
+            error = []
+                
+            for i in range(len(fwave.data[2])):
+                wave.append(fwave.data[2][-i-1])
+                flux.append(fspec.data[2][-i-1])
+                error.append(ferr.data[2][-i-1])
+            for j in range(len(fwave.data[1])):
+                wave.append(fwave.data[1][-j-1])
+                flux.append(fspec.data[1][-j-1])
+                error.append(ferr.data[2][-j-1])
+            for k in range(len(fwave.data[0])):
+                wave.append(fwave.data[0][-k-1])
+                flux.append(fspec.data[0][-k-1])
+                error.append(ferr.data[2][-k-1])
+                
+            fitsvisit.close()
+
+            newflux = functions.skylines_cleaner(wave,flux)
+                
+            #now we run equiv width calc
+
+            lines = [11,12,13,14,15,16,17,18,19,20]
+            EqW = []
+            restwaves = []
+            confidences = []
+            equivs_error = []
+            equiv_check = 1000
+                
+            wave = np.asarray(wave) * lamshift #check which direction shift is going            
+
+            for k in range(10):
+                equiv_width,fcontinuum,shift,rest_wavelength,centers = functions.Br_EqW(wave,newflux,lines[k],vbc)
+                rest = rest_wavelength*(10**10)
+                EqW.append(equiv_width)
+                restwaves.append(rest)
+                dEqW = functions.Br_Error(wave,newflux,error,lines[k],rest)
+                equivs_error.append(dEqW)
+
+            modeldens,modeltemp = functions.Model_Fitter(EqW,equivs_error)
+
+            Confidence = functions.Confidence_Level(wave,newflux,restwaves[0])
+
+            data = [int(loc),twomass,int(plate),int(mjd),fiber,ra,dec,snr,modeldens,modeltemp,Confidence,EqW[0],equivs_error[0]]
+
+            df.loc[len(df)+1] = data
+
+    df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/somelist1.csv',index=False)
+    df = df.iloc[0:0]
+
+def Brackett_Decrement_Modified(equivs,errors,density,temp,folder,title):
+
+    import numpy as np
     import matplotlib.pyplot as plt
+    import pandas as pd
+    import seaborn as sb
 
-    plate = '9246'
-    mjd = '57650'
-    fiber = '291'
+    modeldens = str(density)
+    modelt = str(temp)
+
+    equivs = np.asarray(equivs)
+    errors = np.asarray(errors)
+    equivs1 = equivs/equivs[0]
+
+    summederrors = []
+
+    for i in range(10):
+        dq = equivs1[i] * np.sqrt( (errors[i]/equivs[i])**2 + (errors[0]/equivs[0])**2 )
+        summederrors.append(dq)
+
+    temps = ['3750 K','5000 K','7500 K','8750 K','10000 K','12500 K','15000 K']
+
+    d8T3750 = np.asarray([0.05071,0.04067,0.03307,0.02709,0.02237,0.01835,0.01527,0.01281,0.01081,0.009207])
+    d8T8750 = np.asarray([0.04492,0.03533,0.02837,0.02307,0.019,0.01573,0.01313,0.01105,0.009374,0.00801])
+    d8T15000 = np.asarray([0.02642,0.02042,0.01618,0.01303,0.01067,0.008821,0.007353,0.006188,0.005252,0.004492])
+    d10T3750 = np.asarray([0.03951,0.03036,0.02369,0.01874,0.01503,0.01222,0.01006,0.008374,0.007042,0.005979])
+    d10T8750 = np.asarray([0.02256,0.01705,0.01321,0.01044,0.008401,0.006864,0.005682,0.00476,0.004027,0.003437])
+    d10T15000 = np.asarray([0.01032,0.00755,0.00576,0.004524,0.003634,0.00297,0.002463,0.002068,0.001753,0.001499])
+    d12T3750 = np.asarray([0.2249,0.1888,0.1567,0.1297,0.1077,0.09002,0.07573,0.06418,0.05477,0.04704])
+    d12T8750 = np.asarray([0.9622,1.027,1.079,1.12,1.149,1.162,1.159,1.139,1.104,1.058])
+    d12T15000 = np.asarray([1.082,1.167,1.23,1.267,1.274,1.253,1.208,1.147,1.076,0.9992])
+
+    filename = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Density Files/Density ' + modeldens + ' Ratios.csv'
+    openfile = pd.read_csv(filename)
+
+    y = openfile[modelt+ ' K']
+    y = np.asarray(y)
+    y = y/y[0]
+    yerrors = np.asarray(summederrors)
+
+    plt.figure(figsize=(20,10))
+    plt.title(str(title) + ' Decrement',fontsize=20)
+    plt.xticks((np.arange(11,21,1)))
+    plt.plot(np.arange(11,21,1),y,color=sb.xkcd_rgb['black'],label='Best Fit, Density: '+str(modeldens)+' Temp: '+str(modelt))
+    plt.scatter(np.arange(11,21,1),y,color=sb.xkcd_rgb['black'])
+    plt.errorbar(np.arange(11,21,1),equivs1,yerr=yerrors,ecolor='red',barsabove=True,capsize=3,fmt='-o',color=sb.xkcd_rgb['blue'],label='Br Emission')
+
+    plt.plot(np.arange(11,21,1),d8T3750/d8T3750[0],color=sb.xkcd_rgb['red'],ls='dashed',label='Density: 8 Temp: 3750')
+    plt.plot(np.arange(11,21,1),d8T8750/d8T8750[0],color=sb.xkcd_rgb['red'],ls='dashdot',label='Density: 8 Temp: 8750')
+    plt.plot(np.arange(11,21,1),d8T15000/d8T15000[0],color=sb.xkcd_rgb['red'],ls='solid',label='Density: 8 Temp: 15000')
+    plt.plot(np.arange(11,21,1),d10T3750/d10T3750[0],color=sb.xkcd_rgb['forest green'],ls='dashed',label='Density: 10 Temp: 3750')
+    plt.plot(np.arange(11,21,1),d10T8750/d10T8750[0],color=sb.xkcd_rgb['forest green'],ls='dashdot',label='Density: 10 Temp: 8750')
+    plt.plot(np.arange(11,21,1),d10T15000/d10T15000[0],color=sb.xkcd_rgb['forest green'],ls='solid',label='Density: 10 Temp: 15000')
+    plt.plot(np.arange(11,21,1),d12T3750/d12T3750[0],color=sb.xkcd_rgb['purple'],ls='dashed',label='Density: 12 Temp: 3750')
+    plt.plot(np.arange(11,21,1),d12T8750/d12T8750[0],color=sb.xkcd_rgb['purple'],ls='dashdot',label='Density: 12 Temp: 8750')
+    plt.plot(np.arange(11,21,1),d12T15000/d12T15000[0],color=sb.xkcd_rgb['purple'],ls='solid',label='Density: 12 Temp: 15000')
+    plt.grid(True)
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), shadow=True, ncol=4,frameon=True,facecolor=None,framealpha=1,fontsize=16)
+    
+    plt.savefig(folder+title+' Decrement.pdf',bbox_inches='tight',dpi=300)
+
+    import matplotlib as mpl
+    mpl.rcParams.update(mpl.rcParamsDefault)
+
+def DR15_Plots():
+
+    import functions
+    import matplotlib.pyplot as plt
+    from astropy.io import fits
+    import pandas as pd
+    import numpy as np
+    import itertools
+    from PyAstronomy.pyasl import helcorr as helcorr
+    import os
+    from matplotlib.backends.backend_pdf import PdfPages
 
 
-    if int(plate) > 9700:
-        server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
-        filepath = str(plate) + '/' + str(mjd) + '/' + 'asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
-    else:
-        server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
-        filepath = str(plate) + '/' + str(mjd) + '/' + 'apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + fiber + '.fits'
+    filepath = '/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Catalog1.csv'
+    openfile = pd.read_csv(filepath)
+    g = 0
 
-    openfile = fits.open(server+filepath)
+    for index,row in itertools.islice(openfile.iterrows(),0,None):
 
-    header = openfile[0].header
+        g += 1
+        print(g)
 
-    RA = header['RA']
-    DEC = header['DEC']
+        twomass = row['2Mass ID']
+        plate = row['Plate']
+        mjd = row['MJD']
+        fiber = row['Fiber']
+        density = row['Density']
+        temp = row['Temp']
 
-    c = SkyCoord(ra=RA*u.degree , dec = DEC*u.degree, frame='icrs')
-    c = c.galactic
+        if len(str(fiber)) == 1:
+            fiber = '00' + str(fiber) 
+        if len(str(fiber)) == 2:
+            fiber = '0' + str(fiber)
+        if len(str(fiber)) == 3:
+            fiber = str(fiber)
 
-    longg=c.l.wrap_at(180*u.deg).radian
-    latg=c.b.radian
+        if int(plate) < 8870 :
 
-    fig=plt.figure(figsize=(20,10))
-    ax = plt.subplot(111,projection='aitoff')
-    ax.tick_params(axis='y', labelsize=20)
-    ax.tick_params(axis='x',labelsize=16)
-    ax.grid(True)
+            fitspath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'+str(plate)+'/'+str(mjd)+'/apVisit-r8-'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.fits'
+            
+        elif int(plate) > 8870 and int(plate) < 9700:
 
-    #ax.scatter(longg1,latg1,s=2,color='green',alpha=0.1)
-    ax.scatter(longg,latg,s=100,color='red',marker='*',edgecolor='black',linewidth=0.5)
+            fitspath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'+str(plate)+'/'+str(mjd)+'/apVisit-apogee2-'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.fits'
+            
+        else:
+            fitspath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'+str(plate)+'/'+str(mjd)+'/asVisit-apogee2-'+str(plate)+'-'+str(mjd)+'-'+str(fiber)+'.fits'
+                
+        fitsvisit = fits.open(fitspath)
 
-    plt.show()
-    #plt.savefig('/Users/ballanr/Desktop/Aitoff3.png',bbox_inches='tight',dpi=300)
+        header = fitsvisit[0].header
+
+        ra = header['RA']
+        dec = header['DEC']
+        jd = header['JD-MID']
+        telescope = header['TELESCOP']
+                    
+        if telescope == 'apo25m':
+            height = 2788
+            longg = -105.4913
+            lat = 36.4649
+        else:
+            height = 2380
+            longg = -70.413336
+            lat = -29.05256
+
+        vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+
+        c = 299792.458
+        lamshift = 1 + (vbc/c)
+                    
+        fspec = fitsvisit[1]
+        ferr = fitsvisit[2]
+        fwave = fitsvisit[4]
+        wave = []
+        flux = []
+        error = []
+                    
+        for i in range(len(fwave.data[2])):
+            wave.append(fwave.data[2][-i-1])
+            flux.append(fspec.data[2][-i-1])
+            error.append(ferr.data[2][-i-1])
+        for j in range(len(fwave.data[1])):
+            wave.append(fwave.data[1][-j-1])
+            flux.append(fspec.data[1][-j-1])
+            error.append(ferr.data[2][-j-1])
+        for k in range(len(fwave.data[0])):
+            wave.append(fwave.data[0][-k-1])
+            flux.append(fspec.data[0][-k-1])
+            error.append(ferr.data[2][-k-1])
+                    
+        fitsvisit.close()    
+
+        newflux = functions.skylines_cleaner(wave,flux)
+
+        title = str(plate) + '-' + str(mjd) + '-' + str(fiber)
+
+        #Calculate Equivs and Errors for decrement plot
+        lines = [11,12,13,14,15,16,17,18,19,20]
+        EqW = []
+        Errors = []
+        rest_waves = []
+        centerlines = []
+        for m in range(len(lines)):
+            equivs,Fluxcontinuum,shift,rest_wavelength,centerline = functions.Br_EqW(wave,newflux,lines[m],vbc)
+            rest = rest_wavelength*(10**10)
+            dEqW = functions.Br_Error(wave,newflux,error,lines[m],rest)
+            EqW.append(equivs)
+            Errors.append(dEqW)
+            rest_waves.append(rest)
+            centerlines.append(centerline)
+
+        NGC2264 = [6103,6227]
+        IC348 = [6218,6219,6220,6221,6222,6223,7073,7074,7075,7079]
+        NGC1333 = [6224,6225,6226,7770,7771,7772]
+        orion_A = [7220,7221,7222,7223,7224,7225,7226,7227,7228,7229,7230,7231,7232,7233,7234,9659,9660,9661]
+        lam_ori = [8879,8880,8881,8882,8883,8884,8885,8886,9482]
+        orion_B = [8890,8891,8892,8893,8894,8895,8896,8897,8898,8899]
+        orion_OB1AB = [8900,8901,8902,8903,8904,8905,8906,9468,9469,9470,9471,9472,9473,9474,9475,9476,9477]
+        pleiades = [8888,9257]
+        taurus = [9258,9259,9287,9288]
+        perseus = [9662]
+        W3_4 = [9245,9246,9247,9248,9249]
+        W5 = [9542]
+        J305 = [9753]
+
+        if int(plate) in NGC2264:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/NGC_2264/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in IC348:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/IC_348/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in NGC1333:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/NGC_1333/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in orion_A:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/Orion_A/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in lam_ori:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/Lambda_Ori/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in orion_B:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/Orion_B/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in orion_OB1AB:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/Orion_OB1AB/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+        
+        elif int(plate) in pleiades:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/Pleiades/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            
+        elif int(plate) in taurus:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/Taurus/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in perseus:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/Perseus/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in W3_4:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/W3_4/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in W5:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/W5/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        elif int(plate) in J305:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/305-00/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        else:
+            file_path = '/Users/ballanr/Desktop/File Outputs/DR15/Unknown/Plots/'+str(twomass)+'/'
+            directory = os.path.dirname(file_path)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+        
+        #Br11 Plot
+        with PdfPages(file_path+title+ ' Spectra.pdf') as pdf:
+            
+            #Full Spectra plot
+            minflux = min(newflux) - 100
+            maxflux = max(flux) + 100
+
+            plt.figure(figsize=(20,10))
+            plt.ylabel('Flux',fontsize=18)
+            plt.xlabel('Wavelength',fontsize=18)
+            plt.title(title + ' Spectra',fontsize=20)
+            plt.plot(wave,newflux)
+            for k in range(len(rest_waves)):
+                plt.axvline(rest_waves[k],ls='dashed',color='red',linewidth=1)
+            plt.ylim(minflux,maxflux)
+            pdf.savefig(bbox_inches='tight',dpi=300)
+            plt.close()
+
+            #Brackett Lines Plot
+            for i in range(10):
+                L1 = rest_waves[i] - 27.42 # ~ 27.42 Angstroms
+                L2 = rest_waves[i] - 17.21 # ~ 17.21 Angstroms
+                R1 = rest_waves[i] + 17.24
+                R2 = rest_waves[i] + 27.42
+                restR = rest_waves[i] + 40
+                restL = rest_waves[i] - 40
+                max1 = functions.find_nearest(wave,restL)
+                max2 = functions.find_nearest(wave,restR)
+            
+                maxx = (1.1)*max(newflux[max1:max2])
+                minx = (0.9)*min(newflux[max1:max2])
+
+                
+                plt.figure(figsize=(20,10))
+                
+                plt.plot(wave,newflux)
+                plt.fill_between((L1,L2),minx-100,maxx+100,color='green',alpha=0.5)
+                plt.fill_between((R1,R2),minx-100,maxx+100,color='green',alpha=0.5)
+                plt.axvline(rest_waves[i],ls='dashed',color='red')
+
+                plt.ylabel('Flux',fontsize=18)
+                plt.xlabel('Wavelength',fontsize=18)
+                plt.title(title + ' Br'+str(11+i)+' Line',fontsize=20)
+                plt.ylim(minx,maxx)
+                plt.xlim(restL,restR)
+                plt.xticks(np.linspace(restL,restR,10))
+
+                pdf.savefig(bbox_inches='tight',dpi=300)
+                plt.close()
+
+        #Decrement Plot
+        functions.Brackett_Decrement_Modified(EqW,Errors,density,temp,file_path,title)
+
+        plt.clf()
+        plt.close()
+
+def Catalog_Field_Seperator():
+
+    import pandas as pd
+    import itertools
+
+    NGC2264 = [6103,6227]
+    IC348 = [6218,6219,6220,6221,6222,6223,7073,7074,7075,7079]
+    NGC1333 = [6224,6225,6226,7070,7071,7072]
+    orion_A = [7220,7221,7222,7223,7224,7225,7226,7227,7228,7229,7230,7231,7232,7233,7234,9659,9660,9661]
+    lam_ori = [8879,8880,8881,8882,8883,8884,8885,8886,9482]
+    orion_B = [8890,8891,8892,8893,8894,8895,8896,8897,8898,8899]
+    orion_OB1AB = [8900,8901,8902,8903,8904,8905,8906,9468,9469,9470,9471,9472,9473,9474,9475,9476,9477]
+    pleiades = [8888,9257]
+    taurus = [9258,9259,9287,9288]
+    perseus = [9662]
+    W3_4 = [9245,9246,9247,9248,9249]
+    W5 = [9542]
+    J305 = [9753]
+
+    filepath = '/Users/ballanr/Desktop/File Outputs/DR15/pre-DR15 Catalog1.csv'
+    openfile = pd.read_csv(filepath)
+
+    cols = ['Location ID','2Mass ID','Plate','MJD','Fiber','RA','DEC','SNR','Density',
+                'Temp','Confidence','Br11 EqW','Br11 EqW Error','Standard Deviation']
+
+    dNGC2264 = pd.DataFrame(columns = cols)
+    dIC348 = pd.DataFrame(columns = cols)
+    dNGC1333 = pd.DataFrame(columns = cols)
+    dorion_A = pd.DataFrame(columns = cols)
+    dlam_ori = pd.DataFrame(columns = cols)
+    dorion_B = pd.DataFrame(columns = cols)
+    dorion_OB1AB = pd.DataFrame(columns = cols)
+    dpleiades = pd.DataFrame(columns = cols)
+    dtaurus = pd.DataFrame(columns = cols)
+    dperseus = pd.DataFrame(columns = cols)
+    dW3_4 = pd.DataFrame(columns = cols)
+    dW5 = pd.DataFrame(columns = cols)
+    dJ305 = pd.DataFrame(columns = cols)
+
+    for index,row in itertools.islice(openfile.iterrows(),0,None):
+
+        if (row['Plate']) in NGC2264:
+            dNGC2264.loc[len(dNGC2264)+1] = row
+        elif (row['Plate']) in IC348:
+            dIC348.loc[len(dIC348)+1] = row
+        elif (row['Plate']) in NGC1333:
+            dNGC1333.loc[len(dNGC1333)+1] = row
+        elif (row['Plate']) in orion_A:
+            dorion_A.loc[len(dorion_A)+1] = row
+        elif (row['Plate']) in lam_ori:
+            dlam_ori.loc[len(dlam_ori)+1] = row
+        elif (row['Plate']) in orion_B:
+            dorion_B.loc[len(dorion_B)+1] = row
+        elif (row['Plate']) in orion_OB1AB:
+            dorion_OB1AB.loc[len(dorion_OB1AB)+1] = row
+        elif (row['Plate']) in pleiades:
+            dpleiades.loc[len(dpleiades)+1] = row
+        elif (row['Plate']) in taurus:
+            dtaurus.loc[len(dtaurus)+1] = row
+        elif (row['Plate']) in perseus:
+            dperseus.loc[len(dperseus)+1] = row
+        elif (row['Plate']) in W3_4:
+            dW3_4.loc[len(dW3_4)+1] = row
+        elif (row['Plate']) in W5:
+            dW5.loc[len(dW5)+1] = row
+        elif (row['Plate']) in J305:
+            dJ305.loc[len(dJ305)+1] = row
+
+    dNGC2264.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/NGC_2264 Catalog.csv',index=False)
+    dIC348.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/IC_348 Catalog.csv',index=False)
+    dNGC1333.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/NGC_1333 Catalog.csv',index=False)
+    dorion_A.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Orion_A_Catalog.csv',index=False)
+    dlam_ori.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Lambda_Ori_Catalog.csv',index=False)
+    dorion_B.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Orion_B_Catalog.csv',index=False)
+    dorion_OB1AB.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Orion_OB1AB_Catalog.csv',index=False)
+    dpleiades.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Pleiades_Catalog.csv',index=False)
+    dtaurus.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Taurus_Catalog.csv',index=False)
+    dperseus.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Perseus_Catalog.csv',index=False)
+    dW3_4.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/W3_4_Catalog.csv',index=False)
+    dW5.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/W5_Catalog.csv',index=False)
+    dJ305.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/305-00_Catalog.csv',index=False)
