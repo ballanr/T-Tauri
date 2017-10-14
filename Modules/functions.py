@@ -1497,7 +1497,7 @@ def Protostar_Spectra_Plotter():
         plt.clf()
         plt.close()
 
-def Single_Spectra_Plotter(plateid,MJD,fiber,L,R,B,T):
+def Single_Spectra_Plotter(plateid,MJD,fiber):
 
         import pandas as pd
         import matplotlib.pyplot as plt
@@ -1518,17 +1518,17 @@ def Single_Spectra_Plotter(plateid,MJD,fiber,L,R,B,T):
         plt.title(str(plateid)+ '-' + str(MJD) + '-' + str(fiber),fontsize=20)
         plt.xlabel('Wavelength',fontsize=16)
         plt.ylabel('Flux',fontsize=16)
-        plt.errorbar(wave,flux,yerr=error,ecolor='red')
-        plt.ylim(B,T)
-        #plt.xlim(L,R)
+        #plt.errorbar(wave,flux,yerr=error,ecolor='red')
+        plt.plot(wave,flux)
+        plt.ylim(0,5000)
+        plt.xlim(16770,16850)
 
-        plt.show()
-        #plt.savefig('/Users/ballanr/Desktop/Weird Line.png',bbox_inches='tight',dpi=300)
+        #plt.show()
+        plt.savefig('/Users/ballanr/Desktop/Category 1 Zoomed.pdf',bbox_inches='tight',dpi=300)
 
 def DR15_Uniques():
     import functions
     import matplotlib.pyplot as plt
-    import apogee.tools.read as apread
     from astropy.io import fits
     import pandas as pd
     import numpy as np
@@ -2060,3 +2060,131 @@ def Catalog_Field_Seperator():
     dW3_4.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/W3_4_Catalog.csv',index=False)
     dW5.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/W5_Catalog.csv',index=False)
     dJ305.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/305-00_Catalog.csv',index=False)
+
+
+def DR14skylines_cleaner():
+    
+    import functions
+    import numpy as np
+    import pandas as pd
+    from astropy.io import fits
+    import itertools
+
+    filepath = '/Users/ballanr/Desktop/mdwarves.csv'
+    openfile = pd.read_csv(filepath)
+
+    for index,row in itertools.islice(openfile.iterrows(),0,None): 
+        
+        cols = ['Wavelength']
+        df = pd.DataFrame(columns=cols)
+
+        plate = row['Plate']
+        MJD = row['MJD']
+        fiber = row['Fiber']
+
+        if len(str(row['Fiber'])) == 3:
+            fiber = str(row['Fiber'])
+        elif len(str(row['Fiber'])) == 2:
+            fiber = '0' + str(row['Fiber']) 
+        else:
+            fiber = '00' + str(row['Fiber'])
+
+        server = '/Volumes/CoveyData/APOGEE_Spectra/APOGEE2_DR14/dr14/apogee/spectro/redux/r8/apo25m/'
+        filepath = str(plate) + '/' + str(MJD) + '/apVisit-r8-' + str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.fits'
+        fitsfile = server + filepath
+        filename = str(plate)+'-'+str(MJD)+'-'+str(fiber)
+
+        openfits = fits.open(fitsfile)
+
+        header = openfits[0].header
+
+        try:
+
+            vbc = header['VHELIO']
+
+        except:
+
+            ra = header['RA']
+            dec = header['DEC'] 
+            jd = header['JD-MID']
+            
+            height = 2788
+            longg = -105.4913
+            lat = 36.4649
+            
+            vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+        
+        c = 299792.458
+        lamshift = 1 + (vbc/c)
+            
+        fspec = openfits[1]
+        fwave = openfits[4]
+            
+        wave = []
+        flux = []
+
+            
+        for i in range(len(fwave.data[2])):
+            wave.append(fwave.data[2][-i-1])
+            flux.append(fspec.data[2][-i-1])
+
+        for j in range(len(fwave.data[1])):
+            wave.append(fwave.data[1][-j-1])
+            flux.append(fspec.data[1][-j-1])
+
+        for k in range(len(fwave.data[0])):
+            wave.append(fwave.data[0][-k-1])
+            flux.append(fspec.data[0][-k-1])
+
+            
+        openfits.close()        
+                   
+        windows = []
+        
+
+        removal_beginning = [15185.0,15240.0,15286.0,15330.0,15393.6,15429.9,15460.8,15473.3,15499.6,15508.0,15516.0,
+                            15538.5,15545.0,15568.9,15595.9,15652.9,15701.3,15758.9,15861.5,15867.1,15874.3,15888.8,
+                            15971.1,16028.8,16078.2,16126.4,16193.1,16233.4,16269.5,16278.8,16301.1,16314.8,16339.1,
+                            16349.3,16356.3,16358.6,16387.1,16413.5,16475.1,16476.9,16478.3,16501.4,16527.4,16530.4,
+                            16542.7,16552.9,16558.7,16585.4,16609.4,16611.6,16654.1,16658.2,16666.4,16688.2,16691.2,
+                            16701.7,16707.7,16711.8,16717.7,16723.1,16725.1,16730.9,16753.4,16755.9,16761.5,16764.8,
+                            16839.5,16852.8,16877.2,16883.0,16888.8,16890.3,16899.6,16902.4,16907.1,16908.6,16909.9,16913.7]
+
+        removal_ending = [15189.0,15242.6,15289.0,15334.7,15396.6,15433.9,15463.8,15475.3,15502.3,15511.0,
+                        15518.8,15543.4,15547.6,15571.4,15599.3,15658.9,15704.3,15761.8,15863.6,15871.0,
+                        15877.0,15892.7,15974.4,16033.1,16081.6,16131.0,16196.5,16237.9,16271.4,16280.7,
+                        16304.7,16318.7,16343.0,16353.7,16357.2,16361.7,16390.3,16416.2,16476.3,16477.9,
+                        16479.7,16503.7,16528.9,16531.1,16543.5,16555.1,16560.2,16587.5,16610.7,16612.8,
+                        16655.0,16661.0,16667.3,16690.4,16693.9,16703.8,16710.5,16712.5,16719.7,16724.5,
+                        16725.9,16734.9,16755.2,16756.8,16762.5,16765.9,16841.6,16853.3,16877.8,16884.5,
+                        16889.5,16891.2,16900.2,16905.5,16907.7,16909.3,16910.6,16914.3]
+
+        for i in range(len(removal_beginning)):
+
+            lwindow = functions.find_nearest(wave,removal_beginning[i])
+            rwindow = functions.find_nearest(wave,removal_ending[i])
+
+            windows.append((lwindow,rwindow))
+
+        for i in range(len(removal_beginning)):
+
+            lwindowelement = int(windows[i][0])
+            rwindowelement = int(windows[i][1])
+            leftwindow = wave[windows[i][0]]
+            rightwindow = wave[windows[i][1]]
+            leftflux = flux[windows[i][0]]
+            rightflux = flux[windows[i][1]]
+
+            slope = (rightflux - leftflux) / (rightwindow - leftwindow)
+
+            for k in range(rwindowelement - lwindowelement):
+
+                fluxvalue = slope*(wave[lwindowelement+k] - leftwindow) + leftflux
+                flux[lwindowelement+k] = fluxvalue
+
+        
+        wave = np.asarray(wave) * lamshift 
+        df['Wavelength'] = wave
+        df['Flux'] = flux
+        df.to_csv('/Users/ballanr/Desktop/JessicasDwarves/'+filename+'.csv',index=False)
+        df = df.iloc[0:0]
