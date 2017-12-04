@@ -35,7 +35,6 @@ def Directory_Walk():
     df['Path'] = path
 
     df.to_csv('/Users/ballanr/Desktop/File Outputs/DR14/DR14 List.csv',index=False)
-
 def apVisit_Catalog_Output(filename,savefile):
     '''
     Notes:
@@ -74,7 +73,6 @@ def apVisit_Catalog_Output(filename,savefile):
             writer.writerow((master[i][0],master[i][1],
                             master[i][2],master[i][3],master[i][4]))
             print('Writing row %s' %i)
-
 def find_nearest(array,value):
     
     import numpy as np
@@ -82,7 +80,6 @@ def find_nearest(array,value):
     array = np.asarray(array)
     index = (np.abs(array-value)).argmin()
     return index
-
 def apStar_to_apVisit(locid,twomassid):
     import apogee.tools.read as apread
 
@@ -98,10 +95,6 @@ def apStar_to_apVisit(locid,twomassid):
         fiber = header[1][SFILE][22:25]
         array.append((int(plate),int(MJD),fiber,int(visits)))
     return array,locid,twomassid
-
-
-
-
 def Barycentric_Correction(emission_line,vbc):
 
     #Constants---------------------------------------------------------------------------------------------------------------------------------------|
@@ -124,7 +117,6 @@ def Barycentric_Correction(emission_line,vbc):
     #Returns-----------------------------------------------------------------------------------------------------------------------------------------|
 
     return observed_wavelength,shift,rest_wavelength
-
 def Max_Flux_Check(x_axis,y_axis,centerline):
     import functions
     c = 299792.458
@@ -136,8 +128,6 @@ def Max_Flux_Check(x_axis,y_axis,centerline):
     y_max = max(y_axis[leftwindow:rightwindow])
     z = y_axis.tolist().index(y_max)
     return y_max,z
-
-
 def Brackett_Ratios(plateid,mjd,fiber):
     
     import csv
@@ -185,12 +175,6 @@ def Brackett_Ratios(plateid,mjd,fiber):
     plt.ylabel('Br n>11 / Br 11',fontsize=24)
     plt.xlabel('n',fontsize=24)
     plt.show()
-    
-
-
-
-
-
 def apVisit_Updated_Catalog(infile,rowstart):
 
     import functions
@@ -302,7 +286,6 @@ def apVisit_Updated_Catalog(infile,rowstart):
 
     probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Problem Type'])
     probs.to_csv('/Users/ballanr/Desktop/File Outputs/'+str(rowstart)+'-'+str(rowend)+' Problems.csv',index=False)
-
 def Br_EqW(wave,spec,line,vbc):
     
     import functions
@@ -341,8 +324,6 @@ def Br_EqW(wave,spec,line,vbc):
         equivs = EqW1/Fluxcontinuum
     
     return equivs,Fluxcontinuum,shift,rest_wavelength,centerline
-
-
 def Confidence_Level(wave,flux,restwave):
 
     import numpy as np
@@ -366,7 +347,6 @@ def Confidence_Level(wave,flux,restwave):
     
           
     return confidence1
-
 def skylines_cleaner(wave,flux):
     
     import functions
@@ -416,7 +396,6 @@ def skylines_cleaner(wave,flux):
             flux[lwindowelement+k] = fluxvalue
 
     return flux
-
 def DR13_Brackett_Catalog():
 
     import functions
@@ -709,7 +688,6 @@ def DR14_Brackett_Catalog():
 
     probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
     probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR14/DR14 Problems 1.csv',index=False)
-
 def DR15_Brackett_Catalog():
 
     import functions
@@ -875,7 +853,6 @@ def DR15_Brackett_Catalog():
 
     probs = pd.DataFrame(problems,columns = ['Location ID','2Mass ID','Plate ID','MJD','Fiber','Problem Type'])
     probs.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/blah Problems.csv',index=False)
-
 def Br_Error(wave,flux,err,line,rest):
     
     import functions
@@ -937,7 +914,6 @@ def Br_Error(wave,flux,err,line,rest):
         dEqW = 0
 
     return dEqW
-
 def Brackett_Ratios_Updated(plate,mjd,fiber):
 
     import pandas as pd
@@ -1025,7 +1001,6 @@ def Brackett_Ratios_Updated(plate,mjd,fiber):
             savestring = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/test/D' + str(density) + 'T' + str(temps[j]) + '.pdf'
             plt.savefig(savestring,bbox_inches='tight',dpi=300)
             plt.close()
-
 def Model_Fitter(eqwarray,error):
     import pandas as pd
     import numpy as np
@@ -1078,7 +1053,6 @@ def Model_Fitter(eqwarray,error):
         temp = int(model[4:])
 
     return dens,temp
-
 def Brackett_Ratios_Updated_Grid():
 
     import matplotlib as mpl
@@ -1175,7 +1149,6 @@ def Brackett_Ratios_Updated_Grid():
         plt.savefig('/Users/ballanr/Desktop/File Outputs/DR15/DR15 Brackett Decrement Plots/' + savestring,bbox_inches='tight',dpi=300)
         plt.clf()
         plt.close()
-
 def Aitoff(dr):
     from astropy.coordinates import SkyCoord  # High-level coordinates
     from astropy.coordinates import ICRS, Galactic, FK4, FK5  # Low-level frames
@@ -1449,7 +1422,6 @@ def Aitoff(dr):
 
     #plt.show()
     plt.savefig('/Users/ballanr/Desktop/Aitoff3.png',bbox_inches='tight',dpi=300)
-
 def Protostar_Spectra_Plotter():
 
     import pandas as pd
@@ -1496,7 +1468,6 @@ def Protostar_Spectra_Plotter():
 
         plt.clf()
         plt.close()
-
 def Single_Spectra_Plotter(plateid,MJD,fiber):
 
         import pandas as pd
@@ -1525,7 +1496,6 @@ def Single_Spectra_Plotter(plateid,MJD,fiber):
 
         #plt.show()
         plt.savefig('/Users/ballanr/Desktop/Category 1 Zoomed.pdf',bbox_inches='tight',dpi=300)
-
 def DR15_Uniques():
     import functions
     import matplotlib.pyplot as plt
@@ -1649,7 +1619,6 @@ def DR15_Uniques():
 
     df.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/somelist1.csv',index=False)
     df = df.iloc[0:0]
-
 def Brackett_Decrement_Modified(equivs,errors,density,temp,folder,title):
 
     import numpy as np
@@ -1713,7 +1682,6 @@ def Brackett_Decrement_Modified(equivs,errors,density,temp,folder,title):
 
     import matplotlib as mpl
     mpl.rcParams.update(mpl.rcParamsDefault)
-
 def DR15_Plots():
 
     import functions
@@ -1978,7 +1946,6 @@ def DR15_Plots():
 
         plt.clf()
         plt.close()
-
 def Catalog_Field_Seperator():
 
     import pandas as pd
@@ -2060,8 +2027,6 @@ def Catalog_Field_Seperator():
     dW3_4.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/W3_4_Catalog.csv',index=False)
     dW5.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/W5_Catalog.csv',index=False)
     dJ305.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/305-00_Catalog.csv',index=False)
-
-
 def DR14skylines_cleaner():
     
     import functions
@@ -2188,3 +2153,289 @@ def DR14skylines_cleaner():
         df['Flux'] = flux
         df.to_csv('/Users/ballanr/Desktop/JessicasDwarves/'+filename+'.csv',index=False)
         df = df.iloc[0:0]
+def Br20_Confidence(file,filecreation,br20eval):
+
+    import functions
+    import pandas as pd
+    import itertools
+    import numpy as np
+    from astropy.io import fits
+    from PyAstronomy.pyasl import helcorr
+
+    openfile = pd.read_csv(file)
+    listnum = 0
+
+    if filecreation == 1:
+        for index,row in itertools.islice(openfile.iterrows(),0,None):
+            plate = row['Plate']
+            MJD = row['MJD']
+            if len(str(row['Fiber'])) == 3:
+                fiber = str(row['Fiber'])
+            elif len(str(row['Fiber'])) == 2:
+                fiber = '0' + str(row['Fiber']) 
+            else:
+                fiber = '00' + str(row['Fiber'])
+
+            serverpath = '/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'
+            filestring = str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.csv'
+
+            try:
+
+                fitsfile = pd.read_csv(serverpath+filestring)
+                print('File exists!')
+
+            except: 
+
+                print('Creating file!')
+
+                if int(plate) < 9700:
+                    try:
+                        server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+                        filepath = str(plate) + '/' + str(MJD) + '/apVisit-apogee2-' + str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.fits'
+                        fitsfile = server + filepath
+                        openfits = fits.open(fitsfile)
+                        header = openfits[0].header
+                    except:
+                        server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+                        filepath = str(plate) + '/' + str(MJD) + '/apVisit-r8-' + str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.fits'
+                        fitsfile = server + filepath
+                        openfits = fits.open(fitsfile)
+                        header = openfits[0].header
+                    
+                    try:
+
+                        vbc = header['VHELIO']
+
+                    except:
+
+                        ra = header['RA']
+                        dec = header['DEC'] 
+                        jd = header['JD-MID']
+                        
+                        height = 2788
+                        longg = -105.4913
+                        lat = 36.4649
+                        
+                        vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+                else:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
+                    filepath = str(plate) + '/' + str(MJD) + '/asVisit-apogee2-' + str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.fits'
+                
+                    fitsfile = server + filepath
+                    openfits = fits.open(fitsfile)
+
+                    header = openfits[0].header
+
+                    try:
+
+                        vbc = header['VHELIO']
+
+                    except:
+
+                        ra = header['RA']
+                        dec = header['DEC'] 
+                        jd = header['JD-MID']
+                        
+                        height = 2380
+                        longg = -70.413336
+                        lat = -29.05256
+                        
+                        vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+            
+                c = 299792.458
+                lamshift = 1 + (vbc/c)
+
+                fspec = openfits[1]
+                ferr = openfits[2]
+                fwave = openfits[4]
+                wave = []
+                flux = []
+                error = []
+                
+                for i in range(len(fwave.data[2])):
+                    wave.append(fwave.data[2][-i-1])
+                    flux.append(fspec.data[2][-i-1])
+                    error.append(ferr.data[2][-i-1])
+                for j in range(len(fwave.data[1])):
+                    wave.append(fwave.data[1][-j-1])
+                    flux.append(fspec.data[1][-j-1])
+                    error.append(ferr.data[2][-j-1])
+                for k in range(len(fwave.data[0])):
+                    wave.append(fwave.data[0][-k-1])
+                    flux.append(fspec.data[0][-k-1])
+                    error.append(ferr.data[2][-k-1])
+
+                openfits.close()
+                
+                newflux = functions.skylines_cleaner(wave,flux)
+
+                wave = np.asarray(wave) * lamshift
+
+                df1 = pd.DataFrame(wave,columns=['Wavelength'])
+                df1['Flux'] = newflux
+                df1['Error'] = error
+                filename = str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.csv'
+                df1.to_csv('/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'+filename,index=False)
+                df1 = df1.iloc[0:0]   
+
+
+    if br20eval == 1:
+
+        ones = []
+        twos = []
+        threes = []
+        fours = []
+        others = []
+    
+        for index,row in itertools.islice(openfile.iterrows(),0,None):
+
+            plate = row['Plate']
+            MJD = row['MJD']
+            if len(str(row['Fiber'])) == 3:
+                fiber = str(row['Fiber'])
+            elif len(str(row['Fiber'])) == 2:
+                fiber = '0' + str(row['Fiber']) 
+            else:
+                fiber = '00' + str(row['Fiber'])
+            category = row['Photospheric Contamination*']
+            br11 = row['Br11 EqW']
+            confidence = row['Confidence'] 
+
+            serverpath = '/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/'
+            filestring = str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.csv'
+
+            fluxfile = pd.read_csv(serverpath+filestring)
+
+            wave = fluxfile['Wavelength']
+            flux = fluxfile['Flux']
+
+            if int(plate) < 9700:
+                try:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+                    filepath = str(plate) + '/' + str(MJD) + '/apVisit-apogee2-' + str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.fits'
+                    fitsfile = server + filepath
+                    openfits = fits.open(fitsfile)
+                    header = openfits[0].header
+                except:
+                    server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+                    filepath = str(plate) + '/' + str(MJD) + '/apVisit-r8-' + str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.fits'
+                    fitsfile = server + filepath
+                    openfits = fits.open(fitsfile)
+                    header = openfits[0].header
+
+                try:
+
+                    vbc = header['VHELIO']
+
+                except:
+
+                    ra = header['RA']
+                    dec = header['DEC'] 
+                    jd = header['JD-MID']
+                    
+                    height = 2788
+                    longg = -105.4913
+                    lat = 36.4649
+                    
+                    vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+            else:
+                server = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
+                filepath = str(plate) + '/' + str(MJD) + '/asVisit-apogee2-' + str(plate) + '-' + str(MJD) + '-' + str(fiber) + '.fits'
+            
+                fitsfile = server + filepath
+                openfits = fits.open(fitsfile)
+
+                header = openfits[0].header
+
+                try:
+
+                    vbc = header['VHELIO']
+
+                except:
+
+                    ra = header['RA']
+                    dec = header['DEC'] 
+                    jd = header['JD-MID']
+                    
+                    height = 2380
+                    longg = -70.413336
+                    lat = -29.05256
+                    
+                    vbc,hjd = helcorr(longg,lat,height,ra,dec,jd)
+            
+            c = 299792.458
+            lamshift = 1 + (vbc/c)
+           
+            #print(listnum)
+            #listnum +=1
+
+            observed_wavelength,shift,rest_wavelength = functions.Barycentric_Correction(20,vbc)
+            rest = rest_wavelength*(10**10)
+            centerline = functions.find_nearest(wave,rest)
+
+            try:
+                #regular windows
+
+                L1 = centerline - 301 # ~ 27.42 Angstroms
+                L2 = centerline - 150 # ~ 17.21 Angstroms
+                R1 = centerline + 150
+                R2 = centerline + 301
+
+                a = np.asarray(flux[L2:R1])
+                b = np.asarray(flux[L1:L2])
+                c = np.asarray(flux[R1:R2])
+                #Equivs
+
+                avgc = (np.sum(b) + np.sum(c))/(len(b)+len(c))
+                EqW1 = 0
+
+                if avgc == 0:
+
+                    EqW1 = 0
+                    EqW1_rounded = 0
+                    equivs = 0
+            
+                if avgc != 0:
+
+                    for i in range(L2,R1):
+
+                        trapezoid = (0.5)*(wave[i+1] - wave[i])*(flux[i+1] + flux[i] - (2*avgc))
+                        EqW1 += trapezoid
+            
+                equivs = EqW1/avgc
+        
+
+                #CALCULATIONS
+                try:
+                    fmax = max(a)
+                except:
+                    fmax = 0
+                try:
+                    continuum = np.std(b+c)
+                except:
+                    continuum = np.std(c)
+
+                brcheck = fmax/continuum
+
+            except:
+                brcheck = 0
+                equivs = 0
+            
+            if category == 1:
+                ones.append((br11,confidence,brcheck,equivs))
+            elif category == 2:
+                twos.append((br11,confidence,brcheck,equivs))
+            elif category == 3:
+                threes.append((br11,confidence,brcheck,equivs))
+            elif category == 4:
+                fours.append((br11,confidence,brcheck,equivs))
+            else:
+                others.append((br11,confidence,brcheck,equivs))
+
+        onesarray = np.asarray(ones)
+        twosarray = np.asarray(twos)
+        threesarray = np.asarray(threes)
+        foursarray = np.asarray(fours)
+        othersarray = np.asarray(others)
+        return onesarray,twosarray,threesarray,foursarray,othersarray
+        #print(len(br20))
