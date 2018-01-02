@@ -96,7 +96,6 @@ def Br_Error_Updated(wave,flux,err,line,center):
         dEqW = 0
 
     return dEqW
-
 def Model_Fitter_Updated(eqwarray,error,length):
     import pandas as pd
     import numpy as np
@@ -150,7 +149,6 @@ def Model_Fitter_Updated(eqwarray,error,length):
         temp = int(model[4:])
 
     return dens,temp
-
 def Brackett_Ratios_Updated_Grid(lines):
 
 
@@ -257,8 +255,6 @@ def Brackett_Ratios_Updated_Grid(lines):
         plt.clf()
         plt.close()
         print('Plotted '+ str(counter)+' fits')
-        
-
 def New_All_Model_Fitter():
 
     import functions
@@ -383,3 +379,37 @@ def New_All_Model_Fitter():
 
     df.to_csv('/Users/ballanr/Desktop/File Outputs/Currently Working On/Model Fit Update 17s.csv',index=False)
     df = df.iloc[0:0]
+def False_Spectra():
+
+
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import itertools
+    from astropy.io import fits
+
+    ##### Get Wavegrid #####
+
+
+
+    ##### Generate Random Spectra #####
+
+    mu = 16811
+    sigma = 2
+    wave = np.linspace(16790, 16830,150)
+
+    flux1 = gauss(wave,mu+2,sigma)
+    flux2 = gauss(wave,mu-2,sigma)
+    flux3 = (flux1+flux2)
+    flux4 = 0.5*(flux1+flux2)
+
+    plt.plot(wave,flux1)
+    plt.plot(wave,flux2)
+    plt.plot(wave,flux3)
+    plt.plot(wave,flux4)
+    plt.show()
+
+def gauss(x,mu,sigma): 
+    import numpy as np
+    return (1/(sigma*np.sqrt(2*np.pi)))*np.exp(-0.5*((x-mu)/sigma)**2)
+
