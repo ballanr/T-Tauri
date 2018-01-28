@@ -1,31 +1,55 @@
 import functions
-
+import functions2
 import itertools
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import pandas as pd
 
-#excel = '/Users/ballanr/Desktop/File Outputs/Currently Working On/18/18s.csv'
-#excel = '/Users/ballanr/Desktop/File Outputs/Currently Working On/19/19s.csv'
-excel = '/Users/ballanr/Desktop/File Outputs/Currently Working On/20/20s.csv'
-openfile = pd.read_csv(excel)
-
-sns.set(style='whitegrid',font_scale = 2)
 
 
-data1 = pd.DataFrame(columns = ['Density','Temp'])
-data1['Density'] = openfile['Density']
-data1['Temp'] = openfile['Temp']
+#functions2.Updated_Spectra_Plotter('/Users/ballanr/Desktop/Testgrid.csv')
+#functions2.Updated_Spectra_Plotter()
 
-p = sns.JointGrid(y='Temp',x='Density', data=data1, size=10)
+filepath = '/Users/ballanr/Desktop/Testgrid.csv'
+openfile = pd.read_csv(filepath)
 
-p = p.plot_joint(plt.scatter,s=5,color='black')
-#plt.xlim(-5,5)
-p = p.plot_joint(sns.kdeplot,shade=True,shade_lowest=False,cmap='RdGy',zorder=0,n_levels=15)
+wave = openfile['Wavelength']
+flux = openfile['Flux']
 
-p = p.plot_marginals(sns.distplot,kde=True)
 
-plt.suptitle('W/ Brackett 20')
-plt.savefig('/Users/ballanr/Desktop/File Outputs/Currently Working On/20/KDE.pdf',bbox_inches='tight',dpi=300)
-plt.show()
+blah = np.arange(4091,4110)
+wave = np.asarray(wave)
+flux = np.asarray(flux)
+#print(blah,len(wave))
+
+wave1 = np.delete(wave,blah,axis=0)
+flux1 = np.delete(flux,blah,axis=0)
+#print(wave1[4090:4110])
+
+avg = 0.13207440467
+waveright = wave1[4091]
+waveleft = wave1[4090]
+fluxright = flux1[4091]
+fluxleft = flux1[4090]
+
+slope = (fluxright-fluxleft)/(waveright-waveleft)
+
+
+for i in range(377):
+
+    i += 1
+    value = waveleft + i*avg
+
+    fluxval = slope*(i*avg) + fluxleft
+
+    wave1 = np.insert(wave1,4090+i,value)
+
+    flux1 = np.insert(flux1,4090+i,fluxval)
+
+df = pd.DataFrame(columns=['Wavelength','Flux'])
+df['Wavelength'] = wave1
+df['Flux'] = flux1
+df.to_csv('/Users/ballanr/Desktop/Testgrid2.csv',index=False)
+
+

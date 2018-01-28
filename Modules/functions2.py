@@ -1,7 +1,7 @@
 ############### UPDATED FUNCTIONS ###############
 
 
-def Br_EqW_Updated(wave,spec,line,centerline):
+def Br_EqW_Updated(wave,flux,line,centerline):
     
     import functions
     import functions2
@@ -15,8 +15,9 @@ def Br_EqW_Updated(wave,spec,line,centerline):
     R2 = centerline + 301
 
 
-    Fluxcontinuum = (np.sum(spec[L1:L2])+np.sum(spec[R1:R2])) / (len(spec[L1:L2])+len(spec[R1:R2]))
+    Fluxcontinuum = (np.sum(flux[L1:L2])+np.sum(flux[R1:R2])) / (len(flux[L1:L2])+len(flux[R1:R2]))
     EqW1 = 0
+    EqW2 = 0
 
     if Fluxcontinuum == 0:
 
@@ -24,18 +25,18 @@ def Br_EqW_Updated(wave,spec,line,centerline):
         EqW1_rounded = 0
         equivs = 0
         
+        
     if Fluxcontinuum != 0:
         
-
         for i in range(L2,R1):
 
-            trapezoid = (0.5)*(wave[i+1] - wave[i])*(spec[i+1] + spec[i] - (2*Fluxcontinuum))
+            trapezoid = (0.5)*(wave[i+1] - wave[i])*(flux[i+1] + flux[i] - (2*Fluxcontinuum))
             EqW1 += trapezoid
-        
+            #print(trapezoid)
     #EqW_rounded = round(EqW1/Fluxcontinuum,5)
         equivs = EqW1/Fluxcontinuum
     
-    return equivs,Fluxcontinuum
+    return equivs,Fluxcontinuum,EqW1
 def Br_Error_Updated(wave,flux,err,line,center):
     
     import functions
@@ -74,15 +75,14 @@ def Br_Error_Updated(wave,flux,err,line,center):
 
                 fluxavg += flux1[i] - Fc
                 
-            
             N = len(wave1[L2:R1])
             fluxavg = fluxavg / N
             del_lam = wave1[2] - wave1[1]    
             A = N*del_lam*fluxavg
 
             dA = 0
-            for k in range(L2,R1):
 
+            for k in range(L2,R1):
 
                 dA += err[k]**2
 
@@ -387,29 +387,182 @@ def False_Spectra():
     import matplotlib.pyplot as plt
     import itertools
     from astropy.io import fits
+    import functions
 
     ##### Get Wavegrid #####
-
-
+    filepath = '/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/6103-56230-100.csv'
+    openfile = pd.read_csv(filepath)
+    wave1 = openfile['Wavelength']
 
     ##### Generate Random Spectra #####
 
-    mu = 16811
-    sigma = 2
-    wave = np.linspace(16790, 16830,150)
+    line = np.arange(11,21,1)
+    restwaves = []
 
-    flux1 = gauss(wave,mu+2,sigma)
-    flux2 = gauss(wave,mu-2,sigma)
-    flux3 = (flux1+flux2)
-    flux4 = 0.5*(flux1+flux2)
+    fullwave = np.zeros(12288)
 
-    plt.plot(wave,flux1)
-    plt.plot(wave,flux2)
-    plt.plot(wave,flux3)
-    plt.plot(wave,flux4)
-    plt.show()
+    for i in range(len(line)):
 
+        observed_wavelength,shift,rest_wavelength = functions.Barycentric_Correction(line[i],0)
+        rest = rest_wavelength*(10**10)
+        restwaves.append(rest)
+
+    plt.figure(figsize=(20,10))
+
+    for k in range(len(restwaves)):
+
+        mu = restwaves[k]
+        sigma = 1#*(1+(0.3*k))
+        wave = np.asarray(np.linspace(15144.1809389, 16956.4808405, 12288))
+        flux = np.asarray(gauss(wave1,mu,sigma))
+        #flux = (0.8**(k+1))*flux
+        fullwave += flux
+        plt.axvline(restwaves[k],color='red',ls='dashed',linewidth=0.5)
+    
+    fullwave += 100
+    boop = np.random.normal(0,0.01,12288)
+    boop1 = np.random.normal(0,0.01,12288)
+    boop2 = np.random.normal(0,0.01,12288)
+    boop3 = (1/3)*(boop+boop1+boop2)
+    finalwave = fullwave+boop3
+
+    cols = ['Wavelength']
+    df = pd.DataFrame(columns=cols)
+    df['Wavelength'] = wave1
+    df['0Flux'] = fullwave
+    df['Flux'] = finalwave
+
+    df.to_csv('/Users/ballanr/Desktop/Pseudospectra.csv',index=False)
+    
+    plt.plot(wave1,finalwave,color='green',linewidth=0.5,alpha=0.5)
+    plt.plot(wave1,fullwave)
+    #plt.xlim(16770,16850)
+    #plt.savefig('/Users/ballanr/Desktop/Pseudospectra.pdf',bbox_inches='tight',dpi=300)
 def gauss(x,mu,sigma): 
     import numpy as np
+    A = 1/np.sqrt(2*sigma*np.pi)
     return (1/(sigma*np.sqrt(2*np.pi)))*np.exp(-0.5*((x-mu)/sigma)**2)
 
+def Updated_Spectra_Plotter(filepath):
+
+    import functions
+    import functions2
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    #filepath = '/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/6218-56168-148.csv'
+    #filepath = '/Users/ballanr/Desktop/ChipFixTest.csv'
+    openfile = pd.read_csv(filepath)
+
+    wave = openfile['Wavelength']
+    flux = openfile['Flux']
+
+    a,b,rest = functions.Barycentric_Correction(11,0)
+
+    rest = rest * (10**10)
+
+    centerline = functions.find_nearest(wave,a)
+
+    x,continuum,z = functions2.Br_EqW_Updated(wave,flux,11,centerline)
+
+    L1 = wave[centerline - 301] # ~ 27.42 Angstroms
+    L2 = wave[centerline - 150] # ~ 17.21 Angstroms
+    R1 = wave[centerline + 150]
+    R2 = wave[centerline + 301]
+
+    #print(centerline)
+    #print(wave[4090],wave[4109])
+
+    plt.figure(figsize=(20,10))
+
+    plt.plot(wave,flux)
+    plt.fill_between((L1,L2),0,1200,color='green',alpha=0.5)
+    plt.fill_between((R1,R2),0,1200,color='green',alpha=0.5)
+    plt.axvline(wave[centerline],color='red',ls='dashed')
+    plt.axhline(continuum,color='black',ls='dashed')
+    plt.ylabel('Flux',fontsize=18)
+    plt.xlabel('Wavelength',fontsize=18)
+    #plt.title(title + ' Br'+str(11+i)+' Line',fontsize=20)
+    plt.ylim(200,400)
+    plt.xlim(wave[centerline]-50,wave[centerline]+50)
+    
+
+    plt.show()
+
+    #plt.savefig('/Users/ballanr/Desktop/Chipgap4.pdf',bbox_inches='tight',dpi=300)
+
+def Chipgap_Fix(filepath):
+
+    import functions2
+    import pandas as pd
+    import numpy as np
+
+    filepath1 = '/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/' + str(filepath)
+    openfile = pd.read_csv(filepath1)
+
+    wave = openfile['Wavelength']
+    flux = openfile['Flux']
+
+    avg = 0.13207440467
+
+    wave = np.asarray(wave)
+    flux = np.asarray(flux)
+
+    # Line 12
+
+    chiprange = np.arange(8182,8211)
+
+    wave1 = np.delete(wave,chiprange,axis=0)
+    flux1 = np.delete(flux,chiprange,axis=0)
+
+    waveleft1 = wave1[8181]
+    waveright1 = wave1[8182]
+    fluxleft1 = flux1[8181]
+    fluxright1 = flux1[8182]
+
+    slope1 = (fluxright1-fluxleft1)/(waveright1-waveleft1)
+
+    for i in range(312):
+
+        i += 1
+        value = waveleft1 + i*avg
+
+        fluxval = slope1*(i*avg) + fluxleft1
+
+        wave1 = np.insert(wave1,8181+i,value)
+
+        flux1 = np.insert(flux1,8181+i,fluxval)
+
+
+    
+    # Line 14
+
+    chiprange1 = np.arange(4091,4110)
+
+
+    wave2 = np.delete(wave1,chiprange1,axis=0)
+    flux2 = np.delete(flux1,chiprange1,axis=0)
+
+
+    waveright = wave2[4091]
+    waveleft = wave2[4090]
+    fluxright = flux2[4091]
+    fluxleft = flux2[4090]
+
+    slope = (fluxright-fluxleft)/(waveright-waveleft)
+
+
+    for i in range(377):
+
+        i += 1
+        value = waveleft + i*avg
+
+        fluxval = slope*(i*avg) + fluxleft
+
+        wave2 = np.insert(wave2,4090+i,value)
+
+        flux2 = np.insert(flux2,4090+i,fluxval)
+    
+    return wave2,flux2
+    
