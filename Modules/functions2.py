@@ -32,8 +32,7 @@ def Br_EqW_Updated(wave,flux,line,centerline):
 
             trapezoid = (0.5)*(wave[i+1] - wave[i])*(flux[i+1] + flux[i] - (2*Fluxcontinuum))
             EqW1 += trapezoid
-            #print(trapezoid)
-    #EqW_rounded = round(EqW1/Fluxcontinuum,5)
+
         equivs = EqW1/Fluxcontinuum
     
     return equivs,Fluxcontinuum,EqW1
@@ -565,4 +564,172 @@ def Chipgap_Fix(filepath):
         flux2 = np.insert(flux2,4090+i,fluxval)
     
     return wave2,flux2
+
+def Updated_Brackett_Plotter(filename):
+
+    import functions
+    import functions2
+    import pandas as pd
+    import numpy as np
+    import itertools
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+
+    openfile = pd.read_csv(filename)
+
+    rest_waves = []
+    centerline = []
+    errors = []
+    num = 0
+        
+    for i in range(10):
+        a,b,c = functions.Barycentric_Correction(11+i,0)
+        c = c*(10**10)
+        centerline.append(a)
+        rest_waves.append(c)
+
+
+    for index,row in itertools.islice(openfile.iterrows(),0,None):
+
+        try:
+            #file_path = row['File']
+            #file_path = file_path[:-4]
+            plate = str(row['Plate ID'])
+            mjd = str(row['MJD'])
+            fiber = str(row['Fiber'])
+            if len(str(fiber)) == 2:
+                fiber = '0' + fiber
+            if len(str(fiber)) == 1:
+                fiber = '00' + fiber
+
+            file_path = plate + '-' + mjd + '-' + fiber
+
+            csvfilepath = '/Users/ballanr/Desktop/File Outputs/DR15/Chip Gap Fixed/' + str(file_path) + '.csv'
+            csvfile = pd.read_csv(csvfilepath)
+            
+            wave = csvfile['Wavelength']
+            flux = csvfile['Flux']
+
+            #savestring = '/Users/ballanr/Desktop/File Outputs/DR15/Revised Emitter Plots/' + str(file_path)
+            savestring = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/BrackettEmission/Revised Emitter Plots/' + str(file_path)
+            
+            #Br11 Plot
+            with PdfPages(savestring+ ' Spectra.pdf') as pdf:
+                    
+                #Full Spectra plot
+
+                minflux = min(flux) - 100
+                maxflux = max(flux) + 100
+
+                plt.figure(figsize=(20,10))
+                plt.ylabel('Flux',fontsize=18)
+                plt.xlabel('Wavelength',fontsize=18)
+                plt.title(file_path + ' Spectra',fontsize=20)
+                plt.plot(wave,flux)
+
+                for k in range(len(rest_waves)):
+                    plt.axvline(rest_waves[k],ls='dashed',color='red',linewidth=1)
+
+                plt.ylim(minflux,maxflux)
+                pdf.savefig(bbox_inches='tight',dpi=300)
+                plt.close()
+
+                
+                #Brackett Lines Plot
+                for i in range(10):
+                    
+                    cent = functions.find_nearest(wave,centerline[i])
+                    x,continuum,z = functions2.Br_EqW_Updated(wave,flux,11+i,cent)
+
+                    L1 = rest_waves[i] - 27.42 # ~ 27.42 Angstroms
+                    L2 = rest_waves[i] - 17.21 # ~ 17.21 Angstroms
+                    R1 = rest_waves[i] + 17.24
+                    R2 = rest_waves[i] + 27.42
+                    restR = rest_waves[i] + 40
+                    restL = rest_waves[i] - 40
+                    max1 = functions.find_nearest(wave,restL)
+                    max2 = functions.find_nearest(wave,restR)
+                    
+                    maxx = (1.1)*max(flux[max1:max2])
+                    minx = (0.9)*min(flux[max1:max2])
+
+                        
+                    plt.figure(figsize=(20,10))
+                        
+                    plt.plot(wave,flux)
+                    plt.fill_between((L1,L2),minx-100,maxx+100,color='green',alpha=0.5)
+                    plt.fill_between((R1,R2),minx-100,maxx+100,color='green',alpha=0.5)
+                    plt.axvline(rest_waves[i],ls='dashed',color='red')
+                    plt.axhline(continuum,color='black',ls='dashed')
+
+                    plt.ylabel('Flux',fontsize=18)
+                    plt.xlabel('Wavelength',fontsize=18)
+                    plt.title(file_path + ' Br'+str(11+i)+' Line',fontsize=20)
+                    plt.ylim(minx,maxx)
+                    plt.xlim(restL,restR)
+                    plt.xticks(np.linspace(restL,restR,10))
+
+                    pdf.savefig(bbox_inches='tight',dpi=300)
+                    plt.close()
+            
+            plt.clf()
+            plt.close()
+            num += 1
+            print(num)
     
+        except:
+            errors.append(row['File'])
+    
+    df = pd.DataFrame(columns=['Errors'])
+
+    df['Errors'] = errors
+
+    df.to_csv('/Users/ballanr/Desktop/New Errors.csv',index=False)
+
+def Chi(equivs):
+
+    import pandas as pd
+    import numpy as np
+
+    filepath = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Profile Test.csv'
+    openfile = pd.read_csv(filepath)
+    cols = openfile.columns
+    headers = cols.tolist()
+    
+    chis = []
+    equivs = np.asarray(equivs)
+    #equivs = equivs / equivs[0]
+
+    for i in range(len(cols)): 
+
+        chi_squared = 0
+
+        expected = openfile[cols[i]]
+
+        #expected = expected / expected[0]
+
+        for k in range(len(expected)):
+
+            numerator = (equivs[k] - equivs[k]*expected[k])**2
+            chi = numerator / (equivs[k]*expected[k])
+            
+            chi_squared += chi
+
+        if headers[i].startswith('1'):
+
+            chis.append((headers[i][0:4],headers[i][6:],chi_squared))
+
+        else:
+
+            chis.append((headers[i][0:3],headers[i][4:],chi_squared))
+
+        print(chi_squared)
+
+    x = min(c for (a,b,c) in chis)
+    #y = np.where(chis==x)
+
+    
+    for index, item in enumerate(chis):
+        if item[2] == x:
+            print(index, item[2])
+            print(headers[index])
