@@ -733,3 +733,138 @@ def Chi(equivs):
         if item[2] == x:
             print(index, item[2])
             print(headers[index])
+
+def multichi(name):
+
+    import pandas as pd
+    import numpy as np
+    import functions
+    import functions2
+    import matplotlib.pyplot as plt
+
+    rest_waves = []
+    centerline = []
+    errors = []
+    equivs = []
+    num = 0
+    chia = []
+    chib = []
+    chic = []
+    chid = []
+    chie = []
+    finalchi = []
+
+    profiles = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Profile Test.csv'
+    openprofile = pd.read_csv(profiles)
+    cols = openprofile.columns
+    headers = cols.tolist()
+    
+    # Generating EqW measurements
+    filepath = '/Users/ballanr/Desktop/File Outputs/DR15/Chip Gap Fixed/'+str(name)
+    openfile = pd.read_csv(filepath)
+    wave = openfile['Wavelength']
+    flux = openfile['Flux']
+    
+    for i in range(10):
+        a,b,c = functions.Barycentric_Correction(11+i,0)
+        c = c*(10**10)
+        centerline.append(a)
+        rest_waves.append(c)
+    
+    for k in range(10):
+        cent = functions.find_nearest(wave,centerline[k])
+        x,continuum,z = functions2.Br_EqW_Updated(wave,flux,11+k,cent)
+        equivs.append(x)
+        #print(equivs)
+
+    equivs = np.asarray(equivs)
+    # Generating errors
+
+    # Calculations
+
+    for i in range(len(cols)): 
+
+
+        chi_a = 0
+        chi_b = 0
+        chi_b = 0
+        chi_c = 0
+
+        probs = openprofile[cols[i]]
+
+        for k in range(len(probs)):
+
+            numa = ((equivs[k]/equivs[0]) - (probs[k]/probs[0]))**2
+            denoma = (equivs[k]*0.1)**2
+            chi_a += (numa / denoma)
+        
+            numb = (equivs[k]*(1-probs[k]))**2
+            denomb = (equivs[k]*probs[k])
+            chi_b += (numb / denomb) 
+
+            denomc = (probs[k]/probs[0])**2
+            chi_c += (numa / denomc)
+
+
+        if headers[i].startswith('1'):
+
+            chia.append((headers[i][0:4],headers[i][6:],chi_a))
+            chib.append((headers[i][0:4],headers[i][6:],chi_b))
+            chic.append((headers[i][0:4],headers[i][6:],chi_c))
+            chie.append((headers[i][0:4],headers[i][6:],chi_a/10))
+
+        else:
+
+            chia.append((headers[i][0:3],headers[i][4:],chi_a))
+            chib.append((headers[i][0:3],headers[i][4:],chi_b))
+            chic.append((headers[i][0:3],headers[i][4:],chi_c))
+            chie.append((headers[i][0:3],headers[i][4:],chi_a/10))
+
+    x1 = min(c for (a,b,c) in chia)
+    x2 = min(c for (a,b,c) in chib)
+    x3 = min(c for (a,b,c) in chic)
+    x4 = min(c for (a,b,c) in chie)
+
+    for index, item in enumerate(chia):
+        if item[2] == x1:
+            #print("chia",index, item[2],headers[index])
+            index1 = headers[index]
+    for index, item in enumerate(chib):
+        if item[2] == x2:
+            #print("chib",index, item[2],headers[index])
+            index2 = headers[index]
+    for index, item in enumerate(chic):
+        if item[2] == x3:
+            #print("chic",index, item[2],headers[index])
+            index3 = headers[index]
+    for index, item in enumerate(chie):
+        if item[2] == x4:
+            #print("chie",index, item[2],headers[index])
+            index4 = headers[index]
+
+    plt.figure(figsize = (20,10))
+    plt.xticks((np.arange(11,21,1)),fontsize = 16)
+    plt.yticks(fontsize = 16)
+    plt.plot(np.arange(11,21,1),equivs/equivs[0],label='equivs')
+
+    plt.title(name,fontsize = 24)
+    plt.plot(np.arange(11,21,1),openprofile[str(index1)]/openprofile[str(index1)][0],label='Chi_a = ' + str(x1) + ' , ' + index1)
+    plt.plot(np.arange(11,21,1),openprofile[str(index2)]/openprofile[str(index2)][0],label='Chi_b = ' + str(x2) + ' , ' + index2)
+    plt.plot(np.arange(11,21,1),openprofile[str(index3)]/openprofile[str(index3)][0],label='Chi_c = ' + str(x3) + ' , ' + index3)
+    plt.plot(np.arange(11,21,1),openprofile[str(index4)]/openprofile[str(index4)][0],label='Chi_e = ' + str(x4) + ' , ' + index4)
+    plt.legend(fontsize = 16)
+    #plt.show()
+    plt.savefig('/Users/ballanr/Desktop/File Outputs/Currently Working On/Chi2/' + name[:-4] + '.pdf',bbox_inches = 'tight', dpi = 300)
+    plt.clf()
+    plt.close()
+
+def latex_table():
+
+    import pandas as pd
+
+    filepath = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Density Files/Density 8 Ratios.csv'
+    openfile = pd.read_csv(filepath)
+
+    #df = pd.DataFrame()
+    with open('/Users/ballanr/Desktop/mytable.tex','w') as tf:
+        tf.write(openfile.to_latex(index=False))
