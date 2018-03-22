@@ -36,6 +36,7 @@ def Br_EqW_Updated(wave,flux,line,centerline):
         equivs = EqW1/Fluxcontinuum
     
     return equivs,Fluxcontinuum,EqW1
+
 def Br_Error_Updated(wave,flux,err,line,center):
     
     import functions
@@ -450,8 +451,7 @@ def Updated_Spectra_Plotter(filepath):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    #filepath = '/Users/ballanr/Desktop/File Outputs/DR15/Wave and Flux/6218-56168-148.csv'
-    #filepath = '/Users/ballanr/Desktop/ChipFixTest.csv'
+
     openfile = pd.read_csv(filepath)
 
     wave = openfile['Wavelength']
@@ -473,23 +473,26 @@ def Updated_Spectra_Plotter(filepath):
     #print(centerline)
     #print(wave[4090],wave[4109])
 
-    plt.figure(figsize=(20,10))
+    plt.figure(figsize=(13,10))
 
     plt.plot(wave,flux)
-    plt.fill_between((L1,L2),0,1200,color='green',alpha=0.5)
-    plt.fill_between((R1,R2),0,1200,color='green',alpha=0.5)
+    plt.fill_between((L1,L2),400,1300,color='green',alpha=0.5)
+    plt.fill_between((R1,R2),400,1300,color='green',alpha=0.5)
+    plt.fill_between((wave[centerline]-0.5*x,wave[centerline]+0.5*x),400,continuum,color='blue',alpha=0.5)
     plt.axvline(wave[centerline],color='red',ls='dashed')
     plt.axhline(continuum,color='black',ls='dashed')
-    plt.ylabel('Flux',fontsize=18)
-    plt.xlabel('Wavelength',fontsize=18)
-    #plt.title(title + ' Br'+str(11+i)+' Line',fontsize=20)
-    plt.ylim(200,400)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.ylabel('Flux (10^-17 erg/s/cm^2/Ang)',fontsize=20)
+    plt.xlabel('Wavelength (Ang)',fontsize=20)
+    #plt.title('2M03434449+3143092 Spectra',fontsize=24)
+    plt.ylim(400,1300)
     plt.xlim(wave[centerline]-50,wave[centerline]+50)
     
 
-    plt.show()
+    #plt.show()
 
-    #plt.savefig('/Users/ballanr/Desktop/Chipgap4.pdf',bbox_inches='tight',dpi=300)
+    plt.savefig('/Users/ballanr/Desktop/test.pdf',bbox_inches='tight',dpi=300)
 
 def Chipgap_Fix(filepath):
 
@@ -591,27 +594,26 @@ def Updated_Brackett_Plotter(filename):
 
     for index,row in itertools.islice(openfile.iterrows(),0,None):
 
+        plate = str(row['Plate'])
+        mjd = str(row['MJD'])
+        fiber = str(row['Fiber'])
+        if len(str(fiber)) == 2:
+            fiber = '0' + fiber
+        elif len(str(fiber)) == 1:
+            fiber = '00' + fiber
+
+        file_path = plate + '-' + mjd + '-' + fiber
+
         try:
-            #file_path = row['File']
-            #file_path = file_path[:-4]
-            plate = str(row['Plate ID'])
-            mjd = str(row['MJD'])
-            fiber = str(row['Fiber'])
-            if len(str(fiber)) == 2:
-                fiber = '0' + fiber
-            if len(str(fiber)) == 1:
-                fiber = '00' + fiber
 
-            file_path = plate + '-' + mjd + '-' + fiber
-
-            csvfilepath = '/Users/ballanr/Desktop/File Outputs/DR15/Chip Gap Fixed/' + str(file_path) + '.csv'
+            csvfilepath = '/Users/ballanr/Desktop/Research/DR15/Wave_and_Flux/' + str(file_path) + '.csv'
             csvfile = pd.read_csv(csvfilepath)
             
             wave = csvfile['Wavelength']
             flux = csvfile['Flux']
 
-            #savestring = '/Users/ballanr/Desktop/File Outputs/DR15/Revised Emitter Plots/' + str(file_path)
-            savestring = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/BrackettEmission/Revised Emitter Plots/' + str(file_path)
+            savestring = '/Users/ballanr/Desktop/' + str(file_path)
+            #savestring = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/BrackettEmission/Revised Emitter Plots/' + str(file_path)
             
             #Br11 Plot
             with PdfPages(savestring+ ' Spectra.pdf') as pdf:
@@ -678,7 +680,7 @@ def Updated_Brackett_Plotter(filename):
             print(num)
     
         except:
-            errors.append(row['File'])
+            errors.append(str(file_path))
     
     df = pd.DataFrame(columns=['Errors'])
 
@@ -734,7 +736,7 @@ def Chi(equivs):
             print(index, item[2])
             print(headers[index])
 
-def multichi(name):
+def multichi(name,plot):
 
     import pandas as pd
     import numpy as np
@@ -754,13 +756,13 @@ def multichi(name):
     chie = []
     finalchi = []
 
-    profiles = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Profile Test.csv'
+    profiles = '/Users/ballanr/Desktop/Research/DR15/Density_Temp_Files/Profile Test.csv'
     openprofile = pd.read_csv(profiles)
     cols = openprofile.columns
     headers = cols.tolist()
     
     # Generating EqW measurements
-    filepath = '/Users/ballanr/Desktop/File Outputs/DR15/Chip Gap Fixed/'+str(name)
+    filepath = '/Users/ballanr/Desktop/Research/DR15/Wave_and_Flux/'+str(name)
     openfile = pd.read_csv(filepath)
     wave = openfile['Wavelength']
     flux = openfile['Flux']
@@ -778,7 +780,6 @@ def multichi(name):
         #print(equivs)
 
     equivs = np.asarray(equivs)
-    # Generating errors
 
     # Calculations
 
@@ -795,7 +796,9 @@ def multichi(name):
         for k in range(len(probs)):
 
             numa = ((equivs[k]/equivs[0]) - (probs[k]/probs[0]))**2
-            denoma = (equivs[k]*0.1)**2
+            #denoma = (equivs[k]*0.1)**2
+            #denoma = (probs[k]/probs[0])
+            denoma = ((equivs[k]/equivs[0])*np.sqrt(0.02))**2
             chi_a += (numa / denoma)
         
             numb = (equivs[k]*(1-probs[k]))**2
@@ -842,29 +845,162 @@ def multichi(name):
             #print("chie",index, item[2],headers[index])
             index4 = headers[index]
 
-    plt.figure(figsize = (20,10))
-    plt.xticks((np.arange(11,21,1)),fontsize = 16)
-    plt.yticks(fontsize = 16)
-    plt.plot(np.arange(11,21,1),equivs/equivs[0],label='equivs')
+    if plot == True:
+        plt.figure(figsize = (20,10))
+        plt.xticks((np.arange(11,21,1)),fontsize = 16)
+        plt.yticks(fontsize = 16)
+        plt.plot(np.arange(11,21,1),equivs/equivs[0],label='Equivs')
+        plt.scatter(np.arange(11,21,1),equivs/equivs[0],label='_nolegend_')
 
-    plt.title(name,fontsize = 24)
-    plt.plot(np.arange(11,21,1),openprofile[str(index1)]/openprofile[str(index1)][0],label='Chi_a = ' + str(x1) + ' , ' + index1)
-    plt.plot(np.arange(11,21,1),openprofile[str(index2)]/openprofile[str(index2)][0],label='Chi_b = ' + str(x2) + ' , ' + index2)
-    plt.plot(np.arange(11,21,1),openprofile[str(index3)]/openprofile[str(index3)][0],label='Chi_c = ' + str(x3) + ' , ' + index3)
-    plt.plot(np.arange(11,21,1),openprofile[str(index4)]/openprofile[str(index4)][0],label='Chi_e = ' + str(x4) + ' , ' + index4)
-    plt.legend(fontsize = 16)
-    #plt.show()
-    plt.savefig('/Users/ballanr/Desktop/File Outputs/Currently Working On/Chi2/' + name[:-4] + '.pdf',bbox_inches = 'tight', dpi = 300)
-    plt.clf()
-    plt.close()
+        plt.title(name,fontsize = 24)
+        plt.plot(np.arange(11,21,1),openprofile[str(index1)]/openprofile[str(index1)][0],label='Chi_a = {0:.3f}, '.format(x1) + index1)
+        # plt.plot(np.arange(11,21,1),openprofile[str(index2)]/openprofile[str(index2)][0],label='Chi_b = {0:.3f}, '.format(x2) + index2)
+        # plt.plot(np.arange(11,21,1),openprofile[str(index3)]/openprofile[str(index3)][0],label='Chi_c = {0:.3f}, '.format(x3) + index3)
+        # plt.plot(np.arange(11,21,1),openprofile[str(index4)]/openprofile[str(index4)][0],label='Chi_e = {0:.3f}, '.format(x4) + index4)
+        plt.legend(fontsize = 16)
+        plt.grid(True, alpha = 0.5)
+
+        #plt.show()
+        plt.savefig('/Users/ballanr/Desktop/' + name[:-4] + '.pdf',bbox_inches = 'tight', dpi = 300)
+        #plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/Currently Working On/Emitter Chi2/' + name[:-4] + '.pdf',bbox_inches = 'tight', dpi = 300)
+        
+        plt.clf()
+        plt.close()
+
+    elif plot == False:
+
+        return(index1,chi_a)
 
 def latex_table():
 
     import pandas as pd
 
-    filepath = '/Users/ballanr/Desktop/File Outputs/Brackett Decrements/Density Files/Density 8 Ratios.csv'
+    filepath = '/Users/ballanr/Desktop/Research/Master_List.csv'
     openfile = pd.read_csv(filepath)
 
     #df = pd.DataFrame()
     with open('/Users/ballanr/Desktop/mytable.tex','w') as tf:
+
         tf.write(openfile.to_latex(index=False))
+
+def Master_Catalog(full_list):
+
+    import pandas as pd
+    import functions2
+    import itertools
+    import functions
+
+    openfile = pd.read_csv(full_list)
+
+    cols = ['Location ID', '2Mass ID', 'Plate', 'MJD', 'Fiber', 'RA', 'DEC','Density','Temp','Chi','By Hand','Br11 EqW',
+            'Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW']
+    df = pd.DataFrame(columns = cols)
+
+    i = 0
+
+    for index,row in itertools.islice(openfile.iterrows(),0,None):
+
+        i += 1
+        print(i)
+        eqw = []
+
+        # Location Information
+        loc = row['Location ID']
+        twomass = row['2Mass ID']
+        plate = row['Plate']
+        mjd = row['MJD']
+        fiber = row['Fiber']
+        ra = row['RA']
+        dec = row['DEC']
+        byhand = row['byhand']
+
+        if len(str(fiber)) == 1:
+            fiber = '00' + str(fiber)
+        elif len(str(fiber)) == 2:
+            fiber = '0' + str(fiber)
+        else:
+            fiber = str(fiber)
+
+        filepath = str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+
+        # Calculations
+        dentemp,chi = multichi(filepath,False)
+
+        if dentemp.startswith('1'):
+            density = dentemp[:4]
+            temp = dentemp[5:]
+        else:
+            density = dentemp[:3]
+            temp = dentemp[4:]
+
+        csvfile = pd.read_csv('/Users/ballanr/Desktop/Research/DR15/Wave_and_Flux/' + filepath)
+        wave = csvfile['Wavelength']
+        flux = csvfile['Flux']
+
+        
+        
+        for j in range(10):
+
+            a,b,rest = functions.Barycentric_Correction(11 + j,0)
+            rest = rest * (10**10)
+
+            centerline = functions.find_nearest(wave,rest)
+
+            equivs,y,z = functions2.Br_EqW_Updated(wave, flux, 11 + j, centerline)
+
+            eqw.append(equivs)
+
+        # Outputting Master Catalog
+        data = [loc,twomass,plate,mjd,fiber,ra,dec,density,temp,chi,byhand,eqw[0],eqw[1],
+                eqw[2],eqw[3],eqw[4],eqw[5],eqw[6],eqw[7],eqw[8],eqw[9]]
+        df.loc[len(df)+1] = data
+
+    df.to_csv('/Users/ballanr/Desktop/Test2.csv', index = False)
+    #df.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List.csv',index=False)
+    df = df.iloc[0:0]
+
+def kde_plot():
+
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    filepath = '/Users/ballanr/Desktop/Research/Master_List.csv'
+    #filepath = '/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List.csv'
+    openfile = pd.read_csv(filepath)
+
+    data1 = pd.DataFrame(columns = ['Density','Temp'])
+    
+    ##### For a select group of data #####
+    # data1['Density'] = openfile['Density'][0:50]
+    # data1['Temp'] = openfile['Temp'][0:50]
+
+    ##### For all the data in the file #####
+    data1['Density (cm^-3)'] = openfile['Density'][:50]
+    data1['Temperature (K)'] = openfile['Temp'][:50]
+
+
+    sns.set(style='whitegrid',font_scale=2.5)
+
+    plt.figure(figsize=(13,10))
+
+    p = sns.JointGrid(x = 'Density (cm^-3)', y = 'Temperature (K)', data=data1, size=10)
+
+    p = p.plot_joint(plt.scatter,s=5,color='black')
+
+    p = p.plot_joint(sns.kdeplot,shade=True,shade_lowest=False,cmap='RdGy',zorder=0,n_levels=15)
+
+    p = p.plot_marginals(sns.distplot,kde=True)
+
+
+
+    plt.savefig('/Users/ballanr/Desktop/Research/Currently Working On/Paper Strong KDE.pdf',bbox_inches='tight',dpi=300)
+    #plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/Currently Working On/Strong KDE.pdf',bbox_inches='tight',dpi=300)
+
+    #plt.show()
+
+def plt_reset():
+
+    import matplotlib as mpl
+
+    mpl.rcParams.update(mpl.rcParamsDefault)
