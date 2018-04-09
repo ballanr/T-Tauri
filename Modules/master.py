@@ -1,12 +1,29 @@
-def Master_Catalog():
+def Master_Catalog(full_list):
+
+    import pandas as pd
+    import itertools
 
     ##### Read in file list and create csv file
+    openfile = pd.read_csv(full_list)
+
+    cols = ['Location ID', '2Mass ID', 'Plate', 'MJD', 'Fiber', 'RA', 'DEC','Density','Temp','Chi','By Hand','Br11 EqW',
+            'Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW','Max Order Line']
+    df = pd.DataFrame(columns = cols)
 
     ##### Open fits to get: 2MID, location, plate, mjd, and fiber
+    for index,row in itertools.islice(openfile.iterrows(),0,None):
 
-    ##### Calculate equivalent width (EqW)
+        loc = row['Location ID']
+        twomass = row['2Mass ID']
+        plate = row['Plate']
+        mjd = row['MJD']
+        fiber = row['Fiber']
+        ra = row['RA']
+        dec = row['DEC']
+        byhand = row['byhand']
+        maxline = row['max order']
 
-    ##### Calculate error of EqW
+    ##### Calculate equivalent width (EqW) and error
 
     ##### Calculate confidence score
 
@@ -20,7 +37,7 @@ def Master_Catalog():
 
     print('Huzzah!')
 
-def File_Creator(plate,mjd,fiber):
+def File_Creator(plate,mjd,fiber,version):
 
     ''' Importing Packages '''
 
@@ -51,7 +68,7 @@ def File_Creator(plate,mjd,fiber):
 
     ''' Open .fits file and get information from headers '''
     
-    wavedata,fluxdata,ferrordata,vbc,ra,dec = Fits_Info(plate,mjd,fiber)
+    wavedata,fluxdata,ferrordata,vbc,ra,dec = Fits_Info(plate,mjd,fiber,version)
 
     ''' Stitch together one array for wavelength, one for flux, and one for error '''
 
@@ -102,11 +119,11 @@ def File_Creator(plate,mjd,fiber):
     df['Flux'] = chipflux
     df['Error'] = chiperror
     df['SNR'] = SNR
-    df.to_csv('/Users/ballanr/Desktop/skytest.csv', index=False)
-    #df.to_csv('/Users/ballanr/Desktop/Research/Wave and Flux/' + savestring, index=False)
+    df.to_csv('/Users/ballanr/Desktop/Research/DR15/Spectra Files/All/' + savestring, index=False)
+    #df.to_csv('/Users/ballanr/Desktop/Research/DR15/Spectra Files/' + savestring, index=False)
     df = df.iloc[0:0]
 
-def Fits_Info(plate,mjd,fiber):
+def Fits_Info(plate,mjd,fiber,version):
 
     from astropy.io import fits
     from PyAstronomy.pyasl import helcorr
@@ -119,17 +136,24 @@ def Fits_Info(plate,mjd,fiber):
     lcopath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
 
     # There are also some new t9 files but can ignore for now
-    t9apopath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/9069/57822/apVisit-t9-9069-57822-002.fits'
+    #t9apopath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/9069/57822/apVisit-t9-9069-57822-002.fits'
+    int_plate = int(plate)
 
     # Setting path to file
-    if int(plate) in lco:
+    if int_plate in lco:
         filepath = lcopath + str(plate) + '/' + str(mjd) + '/asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
     else:
-        filepath = apopath + str(plate) + '/' + str(mjd) + '/apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
+        #filepath = apopath + str(plate) + '/' + str(mjd) + '/apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
+        filepath = apopath + str(plate) + '/' + str(mjd) + '/apVisit-' + str(version) + '-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
     
     # Now we can open the fits file on the server
-    fitsfile = fits.open(filepath)
-    header = fitsfile[0].header
+    try:
+        fitsfile = fits.open(filepath)
+        header = fitsfile[0].header
+    except:
+        # filepath = apopath + str(plate) + '/' + str(mjd) + '/apVisit-r8-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
+        # fitsfile = fits.open(filepath)
+        print('Bad file path!')
 
     ''' Get: wavegrid, flux, error, VHELIO, RA, DEC, TELESCOP '''
 
@@ -446,6 +470,110 @@ def Equivalent_Width(wave,flux,errors,snr):
         delta_eqw = EqW * np.sqrt(frac1 + 2*frac2)
 
         equiverr.append(delta_eqw)
-        print(local,local_err,2*num,delta_y)
+        #print(local,local_err,2*num,delta_y)
 
     return (equivs,equiverr)
+
+def Decrement_Model(equivs,equiverr):
+
+    import pandas as pd
+    import numpy as np
+
+    # Reading in the density and temperature models
+    modelpath = '/Users/ballanr/Desktop/Research/DR15/Density_Temp_Files/Profile Test.csv'
+    openmodel = pd.read_csv(modelpath)
+    cols = openmodel.columns
+    headers = cols.tolist()
+
+    equivs = np.asarray(equivs)
+    equiverr = np.asarray(equiverr)
+
+    # Array for storing chi information
+    Chi = []
+
+    # Calculations
+    for i in range(len(cols)):
+
+        chi_squared = 0
+
+        probs = openmodel[cols[i]]
+
+        for k in range(len(probs)):
+            # Calculating numerator
+            ratio = equivs[k] / equivs[0]
+            numerator = ratio - (probs[k] / probs[0])
+            numerator = numerator**2
+
+            # Calculating denominator
+            sigma = ratio * np.sqrt((equiverr[k] / equivs[k])**2 + (equiverr[0] / equivs[0])**2)
+            denominator = (np.sqrt(0.02) * ratio)**2 + sigma**2 + (0.1**2)
+            denominator = np.sqrt(denominator)
+
+            # Adding to Chi
+            chi_squared += numerator / denominator
+
+        # Append information to Chi
+        if headers[i].startswith('1'):
+            Chi.append((headers[i][0:4],headers[i][6:],chi_squared))
+        
+        else:
+            Chi.append((headers[i][0:3],headers[i][4:],chi_squared))
+
+    x = min(c for (a,b,c) in Chi)
+
+    for index, item in enumerate(Chi):
+        if item[2] == x:
+            index1 = headers[index]
+
+    return(index1,x)
+
+def oswalk():
+
+    import os
+    import pandas as pd
+
+    serverpath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/'
+    cols = ['Ap2s']
+    cols1 = ['R8s']
+    cols2 = ['T9s']
+    df = pd.DataFrame(columns = cols)
+    df1 = pd.DataFrame(columns = cols1)
+    df2 = pd.DataFrame(columns = cols2)
+    r8s = []
+    t9s = []
+    ap2s = []
+    for root, dirs, files in os.walk(serverpath, topdown=False):
+        for element in files:
+            if len(element) > 10:
+                try:
+                    check = str(element[8:10])
+                    if check == 't9':
+                        if len(element) == 31 or len(element) == 30:
+                            t9s.append(element)
+                        else:
+                            print('Too long!')
+                    elif check == 'r8':
+                        if len(element) == 30:
+                            r8s.append(element)
+                        else:
+                            print('Too long!')
+                    elif check == 'ap':
+                        if len(element) == 35:
+                            ap2s.append(element)
+                        else:
+                            print('Too long!')      
+                except:
+                    print('Didn\'t work!')
+
+    df['Ap2s'] = ap2s
+    df1['R8s'] = r8s
+    df2['T9s'] = t9s
+    
+    
+    df.to_csv('/Users/ballanr/Desktop/Research/DR15/Ap2.csv',index=False)
+    df1.to_csv('/Users/ballanr/Desktop/Research/DR15/R8.csv',index=False)
+    df2.to_csv('/Users/ballanr/Desktop/Research/DR15/T9.csv',index=False)
+
+    df.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Ap2.csv',index=False)
+    df1.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/R8.csv',index=False)
+    df2.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/T9.csv',index=False)
