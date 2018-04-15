@@ -6,8 +6,9 @@ def Master_Catalog(full_list):
     ##### Read in file list and create csv file
     openfile = pd.read_csv(full_list)
 
-    cols = ['Location ID', '2Mass ID', 'Plate', 'MJD', 'Fiber', 'RA', 'DEC','Density','Temp','Chi','By Hand','Br11 EqW',
-            'Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW','Max Order Line']
+    cols = ['Location ID', '2Mass ID', 'Plate', 'MJD', 'Fiber', 'RA', 'DEC','Density','Temp','Chi','Br11 EqW',
+            'Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW','Br11 Error',
+            'Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error','Br19 Error','Br20 Error']
     df = pd.DataFrame(columns = cols)
 
     ##### Open fits to get: 2MID, location, plate, mjd, and fiber
@@ -15,27 +16,56 @@ def Master_Catalog(full_list):
 
         loc = row['Location ID']
         twomass = row['2Mass ID']
+
         plate = row['Plate']
         mjd = row['MJD']
         fiber = row['Fiber']
+
+        if len(str(fiber)) == 2:
+            fiber = '0' + str(fiber)
+        elif len(str(fiber)) == 1:
+            fiber = '00' + str(fiber)
+        else:
+            fiber = str(fiber)
+
         ra = row['RA']
         dec = row['DEC']
-        byhand = row['byhand']
-        maxline = row['max order']
+        #byhand = row['byhand']
+        #maxline = row['max order']
+
+        csvfilepath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/Emitters/' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+        csvfile = pd.read_csv(csvfilepath)
+
+        cwave = csvfile['Wavelength']
+        cflux = csvfile['Flux']
+        cerrors = csvfile['Error']
+        csnr = csvfile['SNR']
+
+        print(plate,mjd,fiber)
 
     ##### Calculate equivalent width (EqW) and error
+        equivs, errors = Equivalent_Width(cwave,cflux,cerrors,csnr)
 
     ##### Calculate confidence score
 
     ##### Calculate decrement
-
-    ##### Chi-squared
+        index, chi = Decrement_Model(equivs,errors)
 
     ##### Output: 2MID, location, plate, mjd, fiber, density, temperature, chi, equivs, equiv errors
+        if index.startswith('1'):
+            density = index[:4]
+            temp = index[5:]
+        else:
+            density = index[:3]
+            temp = index[4:]
 
     ##### Save catalog
+        data = [loc,twomass,plate,mjd,fiber,ra,dec,density,temp,chi,equivs[0],equivs[1],
+                    equivs[2],equivs[3],equivs[4],equivs[5],equivs[6],equivs[7],equivs[8],equivs[9],errors[0],errors[1],
+                    errors[2],errors[3],errors[4],errors[5],errors[6],errors[7],errors[8],errors[9]]
+        df.loc[len(df)+1] = data
 
-    print('Huzzah!')
+    df.to_csv('/Users/ballanr/Desktop/Research/Master_test.csv',index=False)
 
 def File_Creator(plate,mjd,fiber,version):
 
