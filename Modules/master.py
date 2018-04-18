@@ -11,61 +11,77 @@ def Master_Catalog(full_list):
             'Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error','Br19 Error','Br20 Error']
     df = pd.DataFrame(columns = cols)
 
+    df_fails = pd.DataFrame(columns = ['Location ID', '2Mass ID','Plate','MJD','Fiber'])
+
     ##### Open fits to get: 2MID, location, plate, mjd, and fiber
     for index,row in itertools.islice(openfile.iterrows(),0,None):
+        
+        try:
+        
+            loc = row['Location ID']
+            twomass = row['2Mass ID']
 
-        loc = row['Location ID']
-        twomass = row['2Mass ID']
+            plate = row['Plate']
+            mjd = row['MJD']
+            fiber = row['Fiber']
 
-        plate = row['Plate']
-        mjd = row['MJD']
-        fiber = row['Fiber']
+            if len(str(fiber)) == 2:
+                fiber = '0' + str(fiber)
+            elif len(str(fiber)) == 1:
+                fiber = '00' + str(fiber)
+            else:
+                fiber = str(fiber)
 
-        if len(str(fiber)) == 2:
-            fiber = '0' + str(fiber)
-        elif len(str(fiber)) == 1:
-            fiber = '00' + str(fiber)
-        else:
-            fiber = str(fiber)
+            ra = row['RA']
+            dec = row['DEC']
+            #byhand = row['byhand']
+            #maxline = row['max order']
 
-        ra = row['RA']
-        dec = row['DEC']
-        #byhand = row['byhand']
-        #maxline = row['max order']
+            csvfilepath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/Emitters/' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+            csvfile = pd.read_csv(csvfilepath)
 
-        csvfilepath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/Emitters/' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
-        csvfile = pd.read_csv(csvfilepath)
+            cwave = csvfile['Wavelength']
+            cflux = csvfile['Flux']
+            cerrors = csvfile['Error']
+            csnr = csvfile['SNR']
 
-        cwave = csvfile['Wavelength']
-        cflux = csvfile['Flux']
-        cerrors = csvfile['Error']
-        csnr = csvfile['SNR']
+            print(plate,mjd,fiber)
 
-        print(plate,mjd,fiber)
+            ##### Calculate equivalent width (EqW) and error
+            equivs, errors = Equivalent_Width(cwave,cflux,cerrors,csnr)
 
-    ##### Calculate equivalent width (EqW) and error
-        equivs, errors = Equivalent_Width(cwave,cflux,cerrors,csnr)
+            ##### Calculate confidence score
 
-    ##### Calculate confidence score
+            ##### Calculate decrement
+            index, chi = Decrement_Model(equivs,errors)
 
-    ##### Calculate decrement
-        index, chi = Decrement_Model(equivs,errors)
+            ##### Output: 2MID, location, plate, mjd, fiber, density, temperature, chi, equivs, equiv errors
+            if index.startswith('1'):
+                density = index[:4]
+                temp = index[5:]
+            else:
+                density = index[:3]
+                temp = index[4:]
 
-    ##### Output: 2MID, location, plate, mjd, fiber, density, temperature, chi, equivs, equiv errors
-        if index.startswith('1'):
-            density = index[:4]
-            temp = index[5:]
-        else:
-            density = index[:3]
-            temp = index[4:]
+            ##### Save catalog
+            data = [loc,twomass,plate,mjd,fiber,ra,dec,density,temp,chi,equivs[0],equivs[1],
+                        equivs[2],equivs[3],equivs[4],equivs[5],equivs[6],equivs[7],equivs[8],equivs[9],errors[0],errors[1],
+                        errors[2],errors[3],errors[4],errors[5],errors[6],errors[7],errors[8],errors[9]]
+            df.loc[len(df)+1] = data
 
-    ##### Save catalog
-        data = [loc,twomass,plate,mjd,fiber,ra,dec,density,temp,chi,equivs[0],equivs[1],
-                    equivs[2],equivs[3],equivs[4],equivs[5],equivs[6],equivs[7],equivs[8],equivs[9],errors[0],errors[1],
-                    errors[2],errors[3],errors[4],errors[5],errors[6],errors[7],errors[8],errors[9]]
-        df.loc[len(df)+1] = data
+        except:
+            data = [loc,twomass,plate,mjd,fiber]
+            df_fails.loc[len(df_fails)+1] = data
 
+    ''' Output '''
+
+    ##### Output to local
     df.to_csv('/Users/ballanr/Desktop/Research/Master_test.csv',index=False)
+    df_fails.to_csv('/Users/ballanr/Desktop/Research/Master List Failures.csv',index=False)
+
+    ##### Output to server
+    df.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List.csv',index=False)
+    df_fails.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List_Failures.csv',index=False)
 
 def File_Creator(plate,mjd,fiber,version):
 
@@ -607,3 +623,119 @@ def oswalk():
     df.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Ap2.csv',index=False)
     df1.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/R8.csv',index=False)
     df2.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/T9.csv',index=False)
+
+def KDE_Plot(filepath):
+
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import itertools
+
+    ''' Read in file '''
+
+    openfile = pd.read_csv(filepath)
+    data1 = pd.DataFrame(columns = ['Density','Temp'])
+    
+
+    ##### For some of the data
+    # dens = []
+    # temp = []
+
+    # for index,row in itertools.islice(openfile.iterrows(),0,None):
+    #     if row['Br11 EqW'] > 6:
+
+    #         if row['Max Order Line'] >= 17:
+
+    #             dens.append(row['Density'])
+    #             temp.append(row['Temp'])
+
+    ##### For all the data
+    data1[r'Density (n/cm$^{3}$)'] = openfile['Density']
+    data1['Temperature (K)'] = openfile['Temp']
+
+    ''' Plotting '''
+
+    sns.set(style='whitegrid',font_scale=2.5)
+    plt.figure(figsize=(13,10))
+    p = sns.JointGrid(x = r'Density (n/cm$^{3}$)', y = 'Temperature (K)', data=data1, size=10)
+    p = p.plot_joint(plt.scatter,s=5,color='black')
+    p = p.plot_joint(sns.kdeplot,shade=True,shade_lowest=False,cmap='RdGy',zorder=0,n_levels=15)
+    p = p.plot_marginals(sns.distplot,kde=True)
+
+    ''' Output '''
+
+    ##### Save to local
+    plt.savefig('/Users/ballanr/Desktop/Research/DR15/Plots/KDE.pdf',bbox_inches='tight',dpi=300)
+
+    ##### Save to server
+    plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Plots/KDE.pdf',bbox_inches='tight',dpi=300)
+
+def Brackett_Decrement_Plot(plate,mjd,fiber):
+
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    if len(str(fiber)) == 2:
+
+        fiber = '0' + str(fiber)
+    
+    elif len(str(fiber)) == 1:
+
+        fiber = '00' + str(fiber)
+
+    else:
+
+        fiber = str(fiber)
+
+    serverpath = '/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Spectra Files/Emitters/'
+    filepath = serverpath + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+    openfile = pd.read_csv(filepath)
+
+    wave = openfile['Wavelength']
+    flux = openfile['Flux']
+    error = openfile['Error']
+    snr = openfile['SNR']
+
+    ''' Calculating EqW and Errors '''
+
+    equivs, errors = Equivalent_Width(wave,flux,error,snr)
+
+    equivs = np.asarray(equivs)
+    errors = np.asarray(errors)
+
+    ##### Normalizing eqws and errors by Br 11
+    equivs_scaled = equivs / equivs[0]
+    errors_scaled = []
+
+    for i in range(len(equivs_scaled)):
+
+        err = equivs_scaled[i] * np.sqrt((errors[i]/equivs[i])**2 + (errors[0]/equivs[0])**2)
+        errors_scaled.append(err)
+
+    ''' Plotting '''
+
+    plt.figure(figsize=(13,10))
+
+    #plt.errorbar(np.arange(11,21,1),equivs,errors,color='green',ecolor='red',capsize=5,label='Original')
+    plt.errorbar(np.arange(11,21,1),equivs_scaled,errors_scaled,fmt='.-',ecolor='red',capsize=5,label='Normalized')
+    
+    plt.ylabel(r'Flux$_{n}$ / Flux$_{11}$',fontsize=20)
+    plt.xlabel(r'Brackett $11-20$',fontsize=20)
+    plt.xticks(np.arange(11,21,1))
+    plt.legend(fontsize=18)
+
+    plt.grid(True,alpha=0.3)
+
+    ''' Output '''
+
+    savestring = str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.pdf'
+
+    ##### Save to local
+    #plt.savefig('/Users/ballanr/Desktop/Research/DR15/Plots/Decrements/' + savestring,bbox_inches='tight',dpi=300)
+
+    ##### Save to server
+    plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Plots/Decrements/' + savestring,bbox_inches='tight',dpi=300)
+
+    plt.clf()
+    plt.close()
