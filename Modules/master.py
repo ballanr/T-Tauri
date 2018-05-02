@@ -6,7 +6,7 @@ def Master_Catalog(full_list):
     ##### Read in file list and create csv file
     openfile = pd.read_csv(full_list)
 
-    cols = ['Location ID', '2Mass ID', 'Plate', 'MJD', 'Fiber', 'RA', 'DEC','Density','Temp','Chi','Br11 EqW',
+    cols = ['Location ID', '2Mass ID', 'Plate', 'MJD', 'Fiber', 'RA', 'DEC','Density','Temp','Chi','Max Line','Br11 EqW',
             'Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW','Br11 Error',
             'Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error','Br19 Error','Br20 Error']
     df = pd.DataFrame(columns = cols)
@@ -24,6 +24,7 @@ def Master_Catalog(full_list):
             plate = row['Plate']
             mjd = row['MJD']
             fiber = row['Fiber']
+            maxline = row['max order']
 
             if len(str(fiber)) == 2:
                 fiber = '0' + str(fiber)
@@ -37,13 +38,14 @@ def Master_Catalog(full_list):
             #byhand = row['byhand']
             #maxline = row['max order']
 
-            csvfilepath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/Emitters/' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+            csvfilepath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/All/' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
             csvfile = pd.read_csv(csvfilepath)
 
             cwave = csvfile['Wavelength']
             cflux = csvfile['Flux']
             cerrors = csvfile['Error']
             csnr = csvfile['SNR']
+            
 
             print(plate,mjd,fiber)
 
@@ -64,7 +66,7 @@ def Master_Catalog(full_list):
                 temp = index[4:]
 
             ##### Save catalog
-            data = [loc,twomass,plate,mjd,fiber,ra,dec,density,temp,chi,equivs[0],equivs[1],
+            data = [loc,twomass,plate,mjd,fiber,ra,dec,density,temp,chi,maxline,equivs[0],equivs[1],
                         equivs[2],equivs[3],equivs[4],equivs[5],equivs[6],equivs[7],equivs[8],equivs[9],errors[0],errors[1],
                         errors[2],errors[3],errors[4],errors[5],errors[6],errors[7],errors[8],errors[9]]
             df.loc[len(df)+1] = data
@@ -76,12 +78,12 @@ def Master_Catalog(full_list):
     ''' Output '''
 
     ##### Output to local
-    df.to_csv('/Users/ballanr/Desktop/Research/Master_test.csv',index=False)
-    df_fails.to_csv('/Users/ballanr/Desktop/Research/Master List Failures.csv',index=False)
+    df.to_csv('/Users/ballanr/Desktop/Research/Master_test1.csv',index=False)
+    df_fails.to_csv('/Users/ballanr/Desktop/Research/Master List Failures1.csv',index=False)
 
     ##### Output to server
-    df.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List.csv',index=False)
-    df_fails.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List_Failures.csv',index=False)
+    #df.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List.csv',index=False)
+    #df_fails.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List_Failures.csv',index=False)
 
 def File_Creator(plate,mjd,fiber,version):
 
@@ -638,20 +640,21 @@ def KDE_Plot(filepath):
     
 
     ##### For some of the data
-    # dens = []
-    # temp = []
+    dens = []
+    temp = []
 
-    # for index,row in itertools.islice(openfile.iterrows(),0,None):
-    #     if row['Br11 EqW'] > 6:
+    for index,row in itertools.islice(openfile.iterrows(),0,None):
+        if row['Br11 EqW'] > 5:
 
-    #         if row['Max Order Line'] >= 17:
+            dens.append(row['Density'])
+            temp.append(row['Temp'])
 
-    #             dens.append(row['Density'])
-    #             temp.append(row['Temp'])
+    data1[r'Density (n/cm$^{3}$)'] = dens
+    data1['Temperature (K)'] = temp
 
     ##### For all the data
-    data1[r'Density (n/cm$^{3}$)'] = openfile['Density']
-    data1['Temperature (K)'] = openfile['Temp']
+    # data1[r'Density (n/cm$^{3}$)'] = openfile['Density']
+    # data1['Temperature (K)'] = openfile['Temp']
 
     ''' Plotting '''
 
@@ -665,10 +668,10 @@ def KDE_Plot(filepath):
     ''' Output '''
 
     ##### Save to local
-    plt.savefig('/Users/ballanr/Desktop/Research/DR15/Plots/KDE.pdf',bbox_inches='tight',dpi=300)
+    plt.savefig('/Users/ballanr/Desktop/Research/DR15/Plots/KDE_StrongEmitters.pdf',bbox_inches='tight',dpi=300)
 
     ##### Save to server
-    plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Plots/KDE.pdf',bbox_inches='tight',dpi=300)
+    #plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Plots/KDE_Emitters.pdf',bbox_inches='tight',dpi=300)
 
 def Brackett_Decrement_Plot(plate,mjd,fiber):
 
