@@ -109,10 +109,9 @@ def Barycentric_Correction(emission_line,vbc):
     
     rydberg_red = rydberg_inf/(1+(electron/nucleus)) #Reduced mass Rydberg constant (m^-1)
     rest_wavelength1 = rydberg_red*((1./16.)-(1./n)) #(m^-1)
-    rest_wavelength = 1/rest_wavelength1 #wavelength (m)
-    observed_wavelength1 = rest_wavelength*(1-(vbc/c)) #Finding the location of the peak of the observed spectrum
-    observed_wavelength = observed_wavelength1*(10**10)
-    shift = (rest_wavelength-observed_wavelength1)*(10**10) #Finding the difference between rest and observed wavelengths
+    rest_wavelength = (1/rest_wavelength1)*(10**10) #wavelength (m)
+    observed_wavelength = rest_wavelength*(1+(vbc/c)) #Finding the location of the peak of the observed spectrum
+    shift = rest_wavelength-observed_wavelength #Finding the difference between rest and observed wavelengths
 
     #Returns-----------------------------------------------------------------------------------------------------------------------------------------|
 
@@ -781,11 +780,11 @@ def DR15_Brackett_Catalog():
             for j in range(len(fwave.data[1])):
                 wave.append(fwave.data[1][-j-1])
                 flux.append(fspec.data[1][-j-1])
-                error.append(ferr.data[2][-j-1])
+                error.append(ferr.data[1][-j-1])
             for k in range(len(fwave.data[0])):
                 wave.append(fwave.data[0][-k-1])
                 flux.append(fspec.data[0][-k-1])
-                error.append(ferr.data[2][-k-1])
+                error.append(ferr.data[0][-k-1])
             
             openfile.close()
             

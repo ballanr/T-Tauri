@@ -6,6 +6,79 @@ def Master_Catalog(full_list):
     ##### Read in file list and create csv file
     openfile = pd.read_csv(full_list)
 
+    cols = ['Location ID', '2Mass ID', 'Plate', 'MJD', 'Fiber', 'RA', 'DEC','Br11 EqW','Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW',
+            'Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW','Br11 Error','Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error',
+            'Br17 Error','Br18 Error','Br19 Error','Br20 Error']
+
+    df = pd.DataFrame(columns = cols)
+
+    #df_fails = pd.DataFrame(columns = ['Location ID', '2Mass ID','Plate','MJD','Fiber'])
+    i = 1
+    ##### Open fits to get: 2MID, location, plate, mjd, and fiber
+    for index,row in itertools.islice(openfile.iterrows(),0,None):
+        
+        print(i)
+        i += 1
+
+        loc = row['Location ID']
+        twomass = row['2Mass ID']
+
+        plate = row['Plate']
+        mjd = row['MJD']
+        fiber = row['Fiber']
+
+        if len(str(fiber)) == 2:
+            fiber = '0' + str(fiber)
+        elif len(str(fiber)) == 1:
+            fiber = '00' + str(fiber)
+        else:
+            fiber = str(fiber)
+
+        ra = row['RA']
+        dec = row['DEC']
+
+        try:
+            csvfilepath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/All/' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
+            csvfile = pd.read_csv(csvfilepath)
+
+            cwave = csvfile['Wavelength']
+            cflux = csvfile['Flux']
+            cerrors = csvfile['Error']
+            csnr = csvfile['SNR']
+            
+            ##### Calculate equivalent width (EqW) and error
+            equivs, errors = Equivalent_Width(cwave,cflux,cerrors,csnr)
+
+            ##### Save catalog
+            data = [loc,twomass,plate,mjd,fiber,ra,dec,equivs[0],equivs[1],equivs[2],equivs[3],equivs[4],equivs[5],
+            equivs[6],equivs[7],equivs[8],equivs[9],errors[0],errors[1],errors[2],errors[3],errors[4],errors[5],
+            errors[6],errors[7],errors[8],errors[9]]
+
+            df.loc[len(df)+1] = data
+
+        except:
+            data = [loc,twomass,plate,mjd,fiber,ra,dec,-9999,-9999,-9999,-9999,-9999,-9999,-9999,-9999,-9999,-9999,
+            -9999,-9999,-9999,-9999,-9999,-9999,-9999,-9999,-9999,-9999]
+
+            df.loc[len(df)+1] = data
+
+    ''' Output '''
+
+    ##### Output to local
+    df.to_csv('/Users/ballanr/Desktop/Research/Master_test1.csv',index=False)
+
+    ##### Output to server
+    #df.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List.csv',index=False)
+    #df_fails.to_csv('/Volumes/CoveyData/APOGEE_Spectra/Richard/Master_List_Failures.csv',index=False)
+
+def Emitter_Catalog(full_list):
+
+    import pandas as pd
+    import itertools
+
+    ##### Read in file list and create csv file
+    openfile = pd.read_csv(full_list)
+
     cols = ['Location ID', '2Mass ID', 'Plate', 'MJD', 'Fiber', 'RA', 'DEC','Density','Temp','Chi','Max Line','Br11 EqW',
             'Br12 EqW','Br13 EqW','Br14 EqW','Br15 EqW','Br16 EqW','Br17 EqW','Br18 EqW','Br19 EqW','Br20 EqW','Br11 Error',
             'Br12 Error','Br13 Error','Br14 Error','Br15 Error','Br16 Error','Br17 Error','Br18 Error','Br19 Error','Br20 Error']
@@ -183,15 +256,12 @@ def Fits_Info(plate,mjd,fiber,version):
     apopath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
     lcopath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
 
-    # There are also some new t9 files but can ignore for now
-    #t9apopath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/9069/57822/apVisit-t9-9069-57822-002.fits'
     int_plate = int(plate)
 
     # Setting path to file
     if int_plate in lco:
         filepath = lcopath + str(plate) + '/' + str(mjd) + '/asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
     else:
-        #filepath = apopath + str(plate) + '/' + str(mjd) + '/apVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
         filepath = apopath + str(plate) + '/' + str(mjd) + '/apVisit-' + str(version) + '-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
     
     # Now we can open the fits file on the server
@@ -199,8 +269,6 @@ def Fits_Info(plate,mjd,fiber,version):
         fitsfile = fits.open(filepath)
         header = fitsfile[0].header
     except:
-        # filepath = apopath + str(plate) + '/' + str(mjd) + '/apVisit-r8-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
-        # fitsfile = fits.open(filepath)
         print('Bad file path!')
 
     ''' Get: wavegrid, flux, error, VHELIO, RA, DEC, TELESCOP '''
@@ -668,7 +736,7 @@ def KDE_Plot(filepath):
     ''' Output '''
 
     ##### Save to local
-    plt.savefig('/Users/ballanr/Desktop/Research/DR15/Plots/KDE_StrongEmitters.pdf',bbox_inches='tight',dpi=300)
+    plt.savefig('/Users/ballanr/Desktop/Research/DR15/Plots/KDE_StrongEmitters.png',bbox_inches='tight',dpi=300)
 
     ##### Save to server
     #plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Plots/KDE_Emitters.pdf',bbox_inches='tight',dpi=300)
@@ -679,19 +747,24 @@ def Brackett_Decrement_Plot(plate,mjd,fiber):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    if len(str(fiber)) == 2:
+    # Importing Kwan and Fischer models
+    profiles = '/Users/ballanr/Desktop/Research/DR15/Density_Temp_Files/Profile Test.csv'
+    openprofile = pd.read_csv(profiles)
+    cols = openprofile.columns
+    headers = cols.tolist()
 
+    # Opening spectral file
+    if len(str(fiber)) == 2:
         fiber = '0' + str(fiber)
     
     elif len(str(fiber)) == 1:
-
         fiber = '00' + str(fiber)
 
     else:
-
         fiber = str(fiber)
 
-    serverpath = '/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Spectra Files/Emitters/'
+    #serverpath = '/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Spectra Files/Emitters/'
+    serverpath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/Emitters/'
     filepath = serverpath + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.csv'
     openfile = pd.read_csv(filepath)
 
@@ -707,6 +780,17 @@ def Brackett_Decrement_Plot(plate,mjd,fiber):
     equivs = np.asarray(equivs)
     errors = np.asarray(errors)
 
+    ''' Chi Squared and Best Fit Model '''
+    index, x = Decrement_Model(equivs,errors)
+
+    if index.startswith('1'):
+        dens,temp = index[0:4],index[5:]
+    else:
+        dens,temp = index[0:3],index[4:]
+    
+    normalized_model = openprofile[index]
+    normalized_model = normalized_model/normalized_model[0]
+
     ##### Normalizing eqws and errors by Br 11
     equivs_scaled = equivs / equivs[0]
     errors_scaled = []
@@ -721,8 +805,12 @@ def Brackett_Decrement_Plot(plate,mjd,fiber):
     plt.figure(figsize=(13,10))
 
     #plt.errorbar(np.arange(11,21,1),equivs,errors,color='green',ecolor='red',capsize=5,label='Original')
-    plt.errorbar(np.arange(11,21,1),equivs_scaled,errors_scaled,fmt='.-',ecolor='red',capsize=5,label='Normalized')
+    plt.scatter(np.arange(11,21,1),equivs_scaled,s=25,label='_nolegend_')
+    plt.scatter(np.arange(11,21,1),normalized_model,color='black',s=25,zorder=1,label='_nolegend_')
+    plt.errorbar(np.arange(11,21,1),equivs_scaled,errors_scaled,fmt='-',ecolor='red',capsize=5,label='Normalized',zorder=0)
+    plt.plot(np.arange(11,21,1),normalized_model,color='black',label=index)
     
+
     plt.ylabel(r'Flux$_{n}$ / Flux$_{11}$',fontsize=20)
     plt.xlabel(r'Brackett $11-20$',fontsize=20)
     plt.xticks(np.arange(11,21,1))
@@ -736,9 +824,245 @@ def Brackett_Decrement_Plot(plate,mjd,fiber):
 
     ##### Save to local
     #plt.savefig('/Users/ballanr/Desktop/Research/DR15/Plots/Decrements/' + savestring,bbox_inches='tight',dpi=300)
-
+    plt.savefig('/Users/ballanr/Desktop/testprofile.png',bbox_inches='tight',dpi=300)
+    
     ##### Save to server
-    plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Plots/Decrements/' + savestring,bbox_inches='tight',dpi=300)
+    #plt.savefig('/Volumes/CoveyData/APOGEE_Spectra/Richard/DR15/Plots/Decrements/' + savestring,bbox_inches='tight',dpi=300)
 
     plt.clf()
     plt.close()
+
+def Scholars_Week_Plots(plot):
+
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import seaborn as sns
+
+    if plot == 'Densities':
+        openfile = pd.read_csv('/Users/ballanr/Desktop/Research/DR15/Density_Temp_Files/Profile Test.csv')
+        cols = openfile.columns
+        headers = cols.tolist()
+
+        # density = ['8.0','9.0','10.0','11.0','12.0']
+        density = ['10.0','11.0','12.0']
+        # temp = ['3750','5000','7500','8750','10000','12500','15000']
+        temp = ['5000','10000','15000']
+        legends = ['10.0/5000','11.0/5000','12.0/5000']
+
+        plt.figure(figsize=(13,10))
+
+
+        for i in range(len(density)):
+            for k in range(len(temp)):
+                model_str = str(density[i]) + '/' + str(temp[k])
+                model = openfile[model_str]
+                model = model / model[0]
+
+                if density[i] == '10.0':
+                    colr = sns.xkcd_rgb["red orange"]
+                elif density[i] == '11.0':
+                    colr = sns.xkcd_rgb["medium green"]
+                else:
+                    colr = sns.xkcd_rgb["denim blue"]
+                
+                if temp[k] == '5000':
+                    line = 'solid'
+                elif temp[k] == '10000':
+                    line = 'dashdot'
+                else:
+                    line = 'dashed'
+                
+                if model_str in legends:
+                    lab = density[i]
+                else:
+                    lab = '_nolegend_'
+
+                plt.plot(np.arange(11,21,1),model,color = colr,label=lab,ls=line)
+                plt.scatter(np.arange(11,21,1),model,color = colr,label='_nolegend_')
+        
+        plt.grid(True,alpha=0.5)
+        plt.legend(fontsize=20)
+        plt.xticks(fontsize=18)
+        plt.yticks(fontsize=18)
+        plt.xlabel('Brackett Line',fontsize=20)
+        plt.ylabel('Transition Probability',fontsize=20)
+        plt.savefig('/Users/ballanr/Desktop/test.png',bbox_inches='tight',dpi=300)
+
+    elif plot == 'Density':
+        openfile = pd.read_csv('/Users/ballanr/Desktop/Research/DR15/Density_Temp_Files/Profile Test.csv')
+        cols = openfile.columns
+        headers = cols.tolist()
+
+        # density = ['8.0','9.0','10.0','11.0','12.0']
+        density = ['10.0','11.0','12.0']
+        # temp = ['3750','5000','7500','8750','10000','12500','15000']
+        temp = ['5000','10000','15000']
+        legends = ['10.0/5000','11.0/5000','12.0/5000']
+
+        y1 = openfile['11.0/3750']
+        y2 = openfile['11.0/8750']
+        y3 = openfile['11.0/10000']
+
+        plt.figure(figsize=(13,10))
+
+        plt.plot(np.arange(11,21,1),y1/y1[0])
+        plt.scatter(np.arange(11,21,1),y1/y1[0],label='_nolegend_')
+        plt.plot(np.arange(11,21,1),y2/y2[0])
+        plt.scatter(np.arange(11,21,1),y2/y2[0],label='_nolegend_')
+        plt.plot(np.arange(11,21,1),y3/y3[0])
+        plt.scatter(np.arange(11,21,1),y3/y3[0],label='_nolegend_')
+        
+        plt.grid(True,alpha=0.5)
+        plt.legend(fontsize=20)
+        plt.xticks(fontsize=18)
+        plt.yticks(fontsize=18)
+        plt.xlabel('Brackett Line',fontsize=20)
+        plt.ylabel('Transition Probability',fontsize=20)
+        plt.savefig('/Users/ballanr/Desktop/test.png',bbox_inches='tight',dpi=300)
+
+    elif plot == 'Spectra':
+
+        plate = '6223'
+        mjd = '56283'
+        fiber = '099'
+
+        filepath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/Emitters/' + plate + '-' + mjd + '-' + fiber + '.csv'
+        openfile = pd.read_csv(filepath)
+
+        wave = openfile['Wavelength']
+        wave = wave / 10000
+        flux = openfile['Flux']
+
+        wave1 = wave[flux > 400]
+        flux1 = flux[flux > 400]
+
+        plt.figure(figsize=(20,10))
+
+        plt.plot(wave1,flux1,linewidth=1)
+
+        plt.ylabel(r'Flux $\left(10^{-13}\frac{erg}{s\cdot cm^2\cdot \mu m}\right)$',fontsize=20)
+        plt.xlabel(r'Wavelength $(\mu m)$',fontsize=20)
+        plt.xticks(fontsize=16)
+        plt.yticks(fontsize=16)
+        plt.savefig('/Users/ballanr/Desktop/test.png',bbox_inches='tight',dpi=300)
+
+    elif plot == 'Br11':
+
+        plate = '6223'
+        mjd = '56283'
+        fiber = '099'
+
+        filepath = '/Users/ballanr/Desktop/Research/DR15/Spectra Files/Emitters/' + plate + '-' + mjd + '-' + fiber + '.csv'
+        openfile = pd.read_csv(filepath)
+
+        wave = openfile['Wavelength']
+        wave = wave / 10000
+        flux = openfile['Flux']
+
+        wave1 = wave[flux > 400]
+        flux1 = flux[flux > 400]
+
+        plt.figure(figsize=(13,10))
+
+        plt.plot(wave1,flux1,linewidth=1)
+
+        plt.fill_between((1.6765,1.6785),400,1300,color='black',alpha=0.35)
+        plt.fill_between((1.6837,1.6857),400,1300,color='black',alpha=0.35) 
+        plt.fill_between((1.6805,1.6817),400,585,color='green',alpha=0.8) 
+        plt.axhline(585,ls='dashed',color='black')
+        plt.axvline(1.6811,ls='dashed',color='black',alpha=0.5)
+        
+        plt.xlim(1.6760,1.6860)
+        plt.ylim(500,1300)
+        plt.xticks(fontsize=16)
+        plt.yticks(fontsize=16)
+        plt.ylabel(r'Flux $\left(10^{-13}\frac{erg}{s\cdot cm^2\cdot \mu m}\right)$',fontsize=20)
+        plt.xlabel(r'Wavelength $(\mu m)$',fontsize=20)
+        plt.savefig('/Users/ballanr/Desktop/test.png',bbox_inches='tight',dpi=300)
+
+
+Master_Catalog('/Users/ballanr/Desktop/Research/DR15/Master_File_List.csv')
+#Scholars_Week_Plots('Density')
+
+# import itertools
+# import pandas as pd
+# from astropy.io import fits
+
+# filepath = '/Users/ballanr/Desktop/Research/DR15/T9.csv'
+# filepath = '/Users/ballanr/Desktop/Research/DR15/R8.csv'
+# filepath = '/Users/ballanr/Desktop/Research/DR15/AP2.csv'
+# openfile = pd.read_csv(filepath)
+
+# df = pd.DataFrame(columns=['Location ID', '2Mass ID','Plate','MJD','Fiber','RA','DEC'])
+
+# for index,row in itertools.islice(openfile.iterrows(),0,None):
+
+#     lco = [9753,9761,9762,9856,9906,9907,9908]
+#     apopath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/apo25m/'
+#     lcopath = '/Volumes/CoveyData/APOGEE_Spectra/preDR15/apogee/spectro/redux/visits/lco25m/'
+
+    # if len(row[0]) == 31:
+    #     plate = row[0][11:16]
+    #     mjd = row[0][17:22]
+    #     fiber = row[0][23:26]
+    # else:
+    #     plate = row[0][11:15]
+    #     mjd = row[0][16:21]
+    #     fiber = row[0][22:25]
+
+    # plate = row[0][11:15]
+    # mjd = row[0][16:21]
+    # fiber = row[0][22:25]
+
+#     plate = row[0][16:20]
+#     mjd = row[0][21:26]
+#     fiber = row[0][27:30]
+
+#     version = 'apogee2'
+
+#     # Setting path to file
+#     if int(plate) in lco:
+#         filepath = lcopath + str(plate) + '/' + str(mjd) + '/asVisit-apogee2-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
+#     else:
+#         filepath = apopath + str(plate) + '/' + str(mjd) + '/apVisit-' + str(version) + '-' + str(plate) + '-' + str(mjd) + '-' + str(fiber) + '.fits'
+
+#     fitsfile = fits.open(filepath)
+#     header = fitsfile[0].header
+
+#     loc = header['LOCID']
+#     twomass = header['OBJID']
+#     ra = header['RA']
+#     dec = header['DEC']
+
+#     print(plate,mjd,fiber,len(row[0]))
+#     data = [loc,twomass,plate,mjd,fiber,ra,dec]
+#     df.loc[len(df)+1] = data
+
+# df.to_csv('/Users/ballanr/Desktop/test2.csv',index=False)
+    
+# filepath = '/Users/ballanr/Desktop/Research/DR15/R8.csv'
+# openfile = pd.read_csv(filepath)
+
+# for index,row in itertools.islice(openfile.iterrows(),0,None):
+
+    
+#     plate = row[0][11:15]
+#     mjd = row[0][16:21]
+#     fiber = row[0][22:25]
+
+#     print(plate,mjd,fiber,len(row[0]))
+#     File_Creator(plate,mjd,fiber,'r8')
+
+# filepath = '/Users/ballanr/Desktop/Research/DR15/AP2.csv'
+# openfile = pd.read_csv(filepath)
+
+# for index,row in itertools.islice(openfile.iterrows(),0,None):
+
+#     plate = row[0][16:20]
+#     mjd = row[0][21:26]
+#     fiber = row[0][27:30]
+
+#     print(plate,mjd,fiber,len(row[0]))
+#     File_Creator(plate,mjd,fiber,'apogee2')
+
